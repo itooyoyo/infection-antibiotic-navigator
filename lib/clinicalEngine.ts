@@ -1,0 +1,111 @@
+import { antibiotics } from "@/data/antibiotics";
+import { infectionProfiles } from "@/data/infections";
+import { pathogenProfiles } from "@/data/pathogens";
+import { scoreResistanceRisk } from "@/data/resistanceRules";
+import type { InfectionId, PatientContext, RenalInput } from "@/types/clinical";
+import { calculateRenalFunction } from "@/data/renalDoseRules";
+import { assessReassessment, type ReassessmentInput } from "@/data/reassessmentRules";
+import type { Antibiotic } from "@/types/clinical";
+
+export const unsupportedConditions = [
+  "小児",
+  "妊婦",
+  "髄膜炎",
+  "感染性心内膜炎",
+  "骨髄炎",
+  "好中球減少性発熱",
+  "結核",
+  "真菌症",
+];
+
+export type RedFlagState = Record<string, boolean>;
+export type SourceControlState = Record<string, boolean>;
+
+export function getInfectionProfile(id: InfectionId) {
+  return infectionProfiles.find((profile) => profile.id === id) ?? infectionProfiles[0];
+}
+
+export function getAntibiotics(ids: string[]) {
+  return ids
+    .map((id) => antibiotics.find((drug) => drug.id === id))
+    .filter((drug): drug is Antibiotic => Boolean(drug));
+}
+
+export function getPathogens(id: InfectionId) {
+  return pathogenProfiles[id] ?? [];
+}
+
+export function evaluateRedFlags(redFlags: RedFlagState, infectionId: InfectionId) {
+  const active = Object.entries(redFlags)
+    .filter(([, value]) => value)
+    .map(([key]) => key);
+  const urgentSourceControl =
+    infectionId === "necrotizingSsti" ||
+    infectionId === "cholangitis" ||
+    active.some((item) => ["閉塞性尿路感染疑い", "胆道閉塞疑い", "膿瘍または膿胸疑い", "急速に進行する皮膚所見", "激しい疼痛"].includes(item));
+  return {
+    active,
+    hasAny: active.length > 0,
+    urgentSourceControl,
+    message:
+      "抗菌薬選択だけでなく、蘇生、培養採取、感染源コントロール、専門科への緊急相談を優先して検討してください。",
+  };
+}
+
+export function evaluateSourceControl(sourceControl: SourceControlState) {
+  const active = Object.entries(sourceControl)
+    .filter(([, value]) => value)
+    .map(([key]) => key);
+  const actions = [
+    active.includes("膿瘍") ? "膿瘍のドレナージ" : "",
+    active.includes("膿胸") ? "胸腔ドレナージと呼吸器・外科相談" : "",
+    active.includes("胆道閉塞") ? "胆道ドレナージ" : "",
+    active.includes("尿路閉塞") ? "尿路閉塞解除" : "",
+    active.includes("壊死組織") ? "壊死組織のデブリードマン" : "",
+    active.includes("感染デバイス") ? "感染カテーテル抜去・交換" : "",
+    active.includes("人工物感染") ? "専門科相談と人工物感染の評価" : "",
+    active.includes("化膿性関節炎") ? "整形外科相談と排膿" : "",
+    active.includes("深部感染") ? "画像評価と外科・放射線科相談" : "",
+  ].filter(Boolean);
+  return { active, actions, needsControl: active.length > 0 };
+}
+
+export function buildRecommendation(params: {
+  infectionId: InfectionId;
+  context: PatientContext;
+  redFlags: RedFlagState;
+  sourceControl: SourceControlState;
+  renalInput: RenalInput;
+  reassessment: ReassessmentInput;
+}) {
+  const infection = getInfectionProfile(params.infectionId);
+  const resistance = scoreResistanceRisk(params.context);
+  const redFlagResult = evaluateRedFlags(params.redFlags, params.infectionId);
+  const sourceControlResult = evaluateSourceControl(params.sourceControl);
+  const renal = calculateRenalFunction(params.renalInput);
+  const reassessment = assessReassessment(params.reassessment);
+
+  const standardIds = resistance.level === "high" ? infection.severeCandidateIds : infection.standardCandidateIds;
+  const candidateIds = Array.from(
+    new Set([
+      ...standardIds,
+      ...(params.context.mrsaHistory || params.context.dialysis || params.context.centralVenousCatheter ? ["vancomycin"] : []),
+      ...(params.context.esblHistory || params.context.creHistory ? ["meropenem"] : []),
+      ...(params.context.aspirationRisk && params.infectionId !== "cap" ? ["ampicillinSulbactam"] : []),
+    ]),
+  );
+
+  return {
+    infection,
+    resistance,
+    redFlagResult,
+    sourceControlResult,
+    renal,
+    reassessment,
+    pathogens: getPathogens(params.infectionId),
+    standardCandidates: getAntibiotics(infection.standardCandidateIds),
+    severeCandidates: getAntibiotics(infection.severeCandidateIds),
+    alternativeCandidates: getAntibiotics(infection.alternativeCandidateIds),
+    selectedCandidates: getAntibiotics(candidateIds),
+  };
+}
