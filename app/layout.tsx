@@ -13,8 +13,8 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "感染症・抗菌薬初期選択支援",
-  description: "Infection & Antibiotic Navigator",
+  title: "感染症・抗菌薬初期選択支援 v0.9 Beta",
+  description: "Infection & Antibiotic Navigator v0.9 Beta",
 };
 
 export default function RootLayout({

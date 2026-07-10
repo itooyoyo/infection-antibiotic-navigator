@@ -4,8 +4,6 @@ import Image from "next/image";
 import { useMemo, useState } from "react";
 import { antibioticClasses } from "@/data/antibioticClasses";
 import { antibiotics } from "@/data/antibiotics";
-import { clinicalPearls } from "@/data/clinicalPearls";
-import { diagnosticTips } from "@/data/diagnosticTips";
 import { drugInteractions } from "@/data/drugInteractions";
 import { infectionProfiles } from "@/data/infections";
 import { poorResponseChecklist, type ReassessmentInput } from "@/data/reassessmentRules";
@@ -136,17 +134,12 @@ function ToggleButton({ label, active, onClick }: { label: string; active: boole
 }
 
 function GuideCharacter({ message }: { message: string }) {
-  const todayIndex = new Date().getDate() - 1;
-  const pearl = clinicalPearls[todayIndex % clinicalPearls.length];
-  const tip = diagnosticTips[todayIndex % diagnosticTips.length];
   return (
     <div className="guide-wrap" aria-label="診療ガイド">
       <Image src="/guide-character.png" alt="Dr. Ito Medical Apps Guide Character" width={132} height={132} priority />
       <div className="guide-bubble">
         <strong>診療ガイド</strong>
         <span>{message}</span>
-        <small>Today Clinical Pearl: {pearl.text}</small>
-        <small>Today Diagnostic Tip: {tip.text}</small>
       </div>
     </div>
   );
@@ -172,12 +165,16 @@ export default function NavigatorApp() {
       <section className="hero">
         <div>
           <p className="eyebrow">Infection & Antibiotic Navigator</p>
-          <h1>感染症・抗菌薬初期選択支援</h1>
+          <div className="title-line">
+            <h1>感染症・抗菌薬初期選択支援</h1>
+            <span className="beta-badge">v0.9 Beta</span>
+          </div>
+          <p className="beta-note">β版：医学データおよび抗菌薬情報を順次拡充中です。</p>
           <p className="hero-copy">
             成人感染症の初期評価を、感染臓器、患者背景、耐性菌リスク、感染源コントロール、腎機能、48-72時間後の再評価へ順番に整理します。
           </p>
           <p className="safety-note">
-            診断・処方を自動確定するものではありません。候補を臨床状況、培養結果、施設プロトコル、最新添付文書と合わせて判断してください。
+            本ツールは診断・処方を自動確定するものではありません。患者の臨床状態、培養結果、施設アンチバイオグラム、院内プロトコル、最新の添付文書・ガイドラインを確認し、最終判断は担当医が行ってください。
           </p>
         </div>
         <GuideCharacter message={guideMessages.hero} />
@@ -370,7 +367,7 @@ export default function NavigatorApp() {
           <SummaryItem label="専門科相談" value={result.redFlagResult.hasAny || result.sourceControlResult.needsControl ? "必要性を確認" : "臨床状況で判断"} />
           <SummaryItem label="出典" value={[...result.infection.reference, "PMDA電子添文", "抗菌薬TDM臨床実践ガイドライン", "KDIGO 2024 CKD Guideline", "IDSA耐性菌ガイダンス"].join(" / ")} />
         </div>
-        <p className="safety-note final">このサマリーは診断・処方の確定ではありません。臨床状況と合わせて判断してください。</p>
+        <p className="safety-note final">本ツールは診断・処方を自動確定するものではありません。患者の臨床状態、培養結果、施設アンチバイオグラム、院内プロトコル、最新の添付文書・ガイドラインを確認し、最終判断は担当医が行ってください。</p>
       </section>
     </main>
   );
