@@ -48,7 +48,9 @@ export function assessReassessment(input: ReassessmentInput): {
     input.mentalStatusBetter,
     input.oralIntake,
   ].filter(Boolean).length;
+
   const objectiveImprovement = [input.wbcBetter, input.crpBetter, input.pctBetter, input.lactateBetter].filter(Boolean).length;
+
   const concerns = [
     !input.drainageDone ? "ドレナージや感染源コントロールの実施状況を確認してください。" : "",
     !input.doseChecked ? "投与量を再確認してください。" : "",
@@ -56,6 +58,7 @@ export function assessReassessment(input: ReassessmentInput): {
     !input.absorptionOk ? "吸収障害がないか確認してください。" : "",
     input.newFocus ? "新たな感染巣を検索してください。" : "",
   ].filter(Boolean);
+
   const hasCriticalConcern = !input.drainageDone || !input.doseChecked || !input.intervalChecked || input.newFocus;
   const response =
     concerns.length >= 2 || input.newFocus
@@ -63,6 +66,7 @@ export function assessReassessment(input: ReassessmentInput): {
       : clinicalImprovement >= 4 && objectiveImprovement >= 2 && !hasCriticalConcern
         ? "improving"
         : "uncertain";
+
   const ivToOralReady =
     response === "improving" &&
     input.stableBp &&
@@ -70,5 +74,6 @@ export function assessReassessment(input: ReassessmentInput): {
     input.absorptionOk &&
     input.improvingFever &&
     input.crpBetter;
+
   return { response, concerns, ivToOralReady };
 }

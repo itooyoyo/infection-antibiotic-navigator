@@ -2,7 +2,9 @@
 
 import Image from "next/image";
 import { useMemo, useState } from "react";
+import { clinicalPearls } from "@/data/clinicalPearls";
 import { infectionProfiles } from "@/data/infections";
+import { diagnosticTips } from "@/data/diagnosticTips";
 import { poorResponseChecklist, type ReassessmentInput } from "@/data/reassessmentRules";
 import { resistanceRiskLabels } from "@/data/resistanceRules";
 import { buildRecommendation, unsupportedConditions } from "@/lib/clinicalEngine";
@@ -131,12 +133,17 @@ function ToggleButton({ label, active, onClick }: { label: string; active: boole
 }
 
 function GuideCharacter({ message }: { message: string }) {
+  const todayIndex = new Date().getDate() - 1;
+  const pearl = clinicalPearls[todayIndex % clinicalPearls.length];
+  const tip = diagnosticTips[todayIndex % diagnosticTips.length];
   return (
     <div className="guide-wrap" aria-label="診療ガイド">
       <Image src="/guide-character.png" alt="Dr. Ito Medical Apps Guide Character" width={132} height={132} priority />
       <div className="guide-bubble">
         <strong>診療ガイド</strong>
         <span>{message}</span>
+        <small>Today Clinical Pearl: {pearl.text}</small>
+        <small>Today Diagnostic Tip: {tip.text}</small>
       </div>
     </div>
   );

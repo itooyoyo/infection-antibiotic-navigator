@@ -10,7 +10,6 @@ export type InfectionId =
   | "intraAbdominal"
   | "cellulitis"
   | "abscess"
-  | "necrotizingSsti"
   | "bacteremiaUnknown";
 
 export type RiskLevel = "low" | "moderate" | "high";
@@ -86,6 +85,20 @@ export type Antibiotic = {
   genericName: string;
   drugClass: string;
   route: string;
+  coverage: {
+    mrsa: boolean;
+    pseudomonas: boolean;
+    esbl: boolean | "limited";
+    anaerobes: boolean;
+    atypicals: boolean;
+  };
+  penetration: {
+    csf: string;
+    bile: string;
+    prostate: string;
+    bone: string;
+  };
+  representativeIndications: string[];
   standardFor: InfectionId[];
   targetOrganisms: string[];
   coversMrsa: boolean;

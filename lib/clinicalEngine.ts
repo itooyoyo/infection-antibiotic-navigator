@@ -6,6 +6,7 @@ import type { InfectionId, PatientContext, RenalInput } from "@/types/clinical";
 import { calculateRenalFunction } from "@/data/renalDoseRules";
 import { assessReassessment, type ReassessmentInput } from "@/data/reassessmentRules";
 import type { Antibiotic } from "@/types/clinical";
+import { findSourceControlRules } from "@/data/sourceControl";
 
 export const unsupportedConditions = [
   "小児",
@@ -40,7 +41,6 @@ export function evaluateRedFlags(redFlags: RedFlagState, infectionId: InfectionI
     .filter(([, value]) => value)
     .map(([key]) => key);
   const urgentSourceControl =
-    infectionId === "necrotizingSsti" ||
     infectionId === "cholangitis" ||
     active.some((item) => ["閉塞性尿路感染疑い", "胆道閉塞疑い", "膿瘍または膿胸疑い", "急速に進行する皮膚所見", "激しい疼痛"].includes(item));
   return {
@@ -56,18 +56,9 @@ export function evaluateSourceControl(sourceControl: SourceControlState) {
   const active = Object.entries(sourceControl)
     .filter(([, value]) => value)
     .map(([key]) => key);
-  const actions = [
-    active.includes("膿瘍") ? "膿瘍のドレナージ" : "",
-    active.includes("膿胸") ? "胸腔ドレナージと呼吸器・外科相談" : "",
-    active.includes("胆道閉塞") ? "胆道ドレナージ" : "",
-    active.includes("尿路閉塞") ? "尿路閉塞解除" : "",
-    active.includes("壊死組織") ? "壊死組織のデブリードマン" : "",
-    active.includes("感染デバイス") ? "感染カテーテル抜去・交換" : "",
-    active.includes("人工物感染") ? "専門科相談と人工物感染の評価" : "",
-    active.includes("化膿性関節炎") ? "整形外科相談と排膿" : "",
-    active.includes("深部感染") ? "画像評価と外科・放射線科相談" : "",
-  ].filter(Boolean);
-  return { active, actions, needsControl: active.length > 0 };
+  const rules = findSourceControlRules(active);
+  const actions = rules.map((rule) => `${rule.trigger}: ${rule.action}`);
+  return { active, actions, rules, needsControl: active.length > 0 };
 }
 
 export function buildRecommendation(params: {

@@ -166,6 +166,14 @@ h1 {
   line-height: 1.55;
 }
 
+.guide-bubble small {
+  display: block;
+  margin-top: 8px;
+  color: #a9d9ec;
+  font-size: 0.76rem;
+  line-height: 1.45;
+}
+
 .alert-panel,
 .source-panel,
 .result-strip,
