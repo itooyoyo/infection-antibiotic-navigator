@@ -427,6 +427,155 @@ dd {
   border-color: var(--line);
 }
 
+.antibiotic-reference {
+  margin-top: 28px;
+  border-top: 1px solid var(--line);
+  padding-top: 22px;
+}
+
+.reference-heading span,
+.source-line {
+  color: var(--muted);
+  font-size: 0.82rem;
+}
+
+.reference-heading h3 {
+  margin: 6px 0;
+  color: #f2fbff;
+  font-size: 1.35rem;
+}
+
+.reference-heading p,
+.class-detail > p {
+  color: #cfe0eb;
+  line-height: 1.65;
+}
+
+.class-accordion {
+  border-bottom: 1px solid var(--line);
+  padding: 10px 0;
+}
+
+.class-accordion > summary {
+  display: flex;
+  min-height: 52px;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  color: #f5fbff;
+  list-style: none;
+}
+
+.class-accordion > summary::-webkit-details-marker {
+  display: none;
+}
+
+.class-accordion > summary span {
+  font-size: 1.08rem;
+  font-weight: 800;
+}
+
+.class-accordion > summary small {
+  border-radius: 999px;
+  padding: 6px 10px;
+  background: #dff8ff;
+  color: #061425;
+  font-weight: 800;
+  white-space: nowrap;
+}
+
+.class-detail {
+  padding: 4px 0 18px;
+}
+
+.class-grid,
+.drug-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+  gap: 12px;
+  margin-top: 14px;
+}
+
+.info-block {
+  border-top: 1px solid rgba(126, 210, 255, 0.18);
+  padding-top: 10px;
+}
+
+.info-block span {
+  color: var(--cyan);
+  font-size: 0.82rem;
+  font-weight: 800;
+}
+
+.info-block p {
+  margin: 6px 0 0;
+  color: #d8ebf5;
+  line-height: 1.58;
+}
+
+.drug-card-list {
+  display: grid;
+  gap: 16px;
+  margin-top: 18px;
+}
+
+.drug-card {
+  border-top: 1px solid var(--line);
+  padding-top: 16px;
+}
+
+.drug-card strong {
+  display: block;
+  color: #f8fcff;
+  font-size: 1.08rem;
+}
+
+.drug-card > div > span {
+  color: var(--muted);
+  font-size: 0.88rem;
+}
+
+.tag-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.tag-row span {
+  border-radius: 999px;
+  padding: 6px 9px;
+  background: #e7fff5;
+  color: #061425;
+  font-size: 0.78rem;
+  font-weight: 800;
+}
+
+.drug-alert,
+.interaction {
+  margin: 12px 0 0;
+  border-left: 3px solid var(--yellow);
+  padding: 10px 12px;
+  background: #fff7d6;
+  color: #3f2600;
+  line-height: 1.55;
+}
+
+.interaction.contraindicated {
+  border-left-color: var(--pink);
+  background: #ffe8f3;
+  color: #3b1023;
+}
+
+.interaction.avoid {
+  border-left-color: var(--yellow);
+}
+
+.source-line {
+  margin-top: 12px;
+  line-height: 1.5;
+}
+
 .renal-results div span,
 .summary-grid span {
   display: block;

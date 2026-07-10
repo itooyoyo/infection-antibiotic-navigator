@@ -1,0 +1,68 @@
+import type { PkPdRule } from "@/types/antibiotics";
+
+export const pkpdRules: PkPdRule[] = [
+  {
+    id: "beta-lactam-time-dependent",
+    classId: "penicillins",
+    pkpdIndex: "%fT>MIC",
+    practicalNote: "βラクタム系はPBPへ結合し、細胞壁架橋形成を阻害します。効果はMICを上回る時間に依存します。",
+    renalNote: "多くは腎排泄性で、腎機能低下時は投与間隔や投与量の確認が必要です。",
+    source: "JAID/JSC感染症治療ガイド2023、PMDA電子添文",
+  },
+  {
+    id: "bli-penicillin-time-dependent",
+    classId: "beta-lactamase-inhibitor-penicillins",
+    pkpdIndex: "%fT>MIC",
+    practicalNote: "βラクタム本体の時間依存性に加え、阻害薬の対象βラクタマーゼを確認します。",
+    renalNote: "腎機能、透析、CRRTでは施設プロトコル確認が必要です。",
+    source: "PMDA電子添文、院内プロトコル",
+  },
+  {
+    id: "cephem-time-dependent",
+    classId: "cephems",
+    pkpdIndex: "%fT>MIC",
+    practicalNote: "セフェム系もPBP結合による細胞壁合成阻害で、腸球菌は自然耐性として扱います。",
+    renalNote: "多くは腎機能調整が必要です。薬剤ごとに胆汁排泄や腎排泄の比率を確認します。",
+    source: "JAID/JSC感染症治療ガイド2023、PMDA電子添文",
+  },
+  {
+    id: "carbapenem-time-dependent",
+    classId: "carbapenems",
+    pkpdIndex: "%fT>MIC",
+    practicalNote: "ESBLリスク感染症で候補になりますが、MRSAと非定型病原体には無効です。",
+    renalNote: "腎機能低下時は調整確認が必要です。バルプロ酸併用禁忌を強く確認します。",
+    source: "PMDA電子添文、IDSA耐性菌ガイダンス",
+  },
+  {
+    id: "glycopeptide-auc",
+    classId: "glycopeptides",
+    pkpdIndex: "AUC/MIC",
+    practicalNote: "MRSA重症感染ではAUC評価を検討します。単純なトラフ値だけで評価しません。",
+    renalNote: "腎機能とTDMに基づく個別調整が必要です。",
+    source: "抗菌薬TDM臨床実践ガイドライン、PMDA電子添文",
+  },
+  {
+    id: "linezolid-auc",
+    classId: "anti-mrsa-others",
+    pkpdIndex: "AUC/MIC",
+    practicalNote: "抗MRSA薬は薬剤ごとに肺、尿路、菌血症、深部感染での位置付けが異なります。",
+    renalNote: "薬剤ごとに腎機能調整や血球減少リスクを確認します。",
+    source: "PMDA電子添文、国内ガイドライン",
+  },
+  {
+    id: "tetracycline-auc",
+    classId: "tetracyclines",
+    pkpdIndex: "AUC/MIC",
+    practicalNote: "非定型病原体や一部のMRSAで候補になりますが、重症菌血症では慎重に扱います。",
+    renalNote: "薬剤ごとに腎機能と肝機能の確認が必要です。",
+    source: "PMDA電子添文",
+  },
+  {
+    id: "macrolide-auc",
+    classId: "macrolides",
+    pkpdIndex: "AUC/MIC",
+    practicalNote: "非定型病原体カバーで候補です。QT延長、体液量、併用薬を確認します。",
+    renalNote: "薬剤ごとの腎機能・肝機能注意を確認します。",
+    source: "PMDA電子添文、JAID/JSC感染症治療ガイド2023",
+  },
+];

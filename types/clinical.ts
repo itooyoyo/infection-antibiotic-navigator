@@ -83,8 +83,27 @@ export type RenalResult = {
 export type Antibiotic = {
   id: string;
   genericName: string;
+  brandNames: string[];
+  classId: string;
   drugClass: string;
   route: string;
+  mainSpectrum: string[];
+  activity: {
+    mrsa: "あり" | "なし" | "限定的" | "薬剤ごとに確認" | "感受性確認が必要";
+    pseudomonas: "あり" | "なし" | "限定的" | "薬剤ごとに確認" | "感受性確認が必要";
+    anaerobes: "あり" | "なし" | "限定的" | "薬剤ごとに確認" | "感受性確認が必要";
+    atypicals: "あり" | "なし" | "限定的" | "薬剤ごとに確認" | "感受性確認が必要";
+  };
+  esblPosition: string;
+  ampCPosition: string;
+  tissuePenetration: {
+    csf: string;
+    lung: string;
+    bile: string;
+    urine: string;
+    prostate: string;
+    bone: string;
+  };
   coverage: {
     mrsa: boolean;
     pseudomonas: boolean;
@@ -99,6 +118,12 @@ export type Antibiotic = {
     bone: string;
   };
   representativeIndications: string[];
+  majorAdverseEffects: string[];
+  interactions: string[];
+  domesticApprovedIndications: string[];
+  guidelinePosition: string;
+  safetyAlerts: string[];
+  checkedAt: string;
   standardFor: InfectionId[];
   targetOrganisms: string[];
   coversMrsa: boolean;

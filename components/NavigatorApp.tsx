@@ -2,9 +2,12 @@
 
 import Image from "next/image";
 import { useMemo, useState } from "react";
+import { antibioticClasses } from "@/data/antibioticClasses";
+import { antibiotics } from "@/data/antibiotics";
 import { clinicalPearls } from "@/data/clinicalPearls";
-import { infectionProfiles } from "@/data/infections";
 import { diagnosticTips } from "@/data/diagnosticTips";
+import { drugInteractions } from "@/data/drugInteractions";
+import { infectionProfiles } from "@/data/infections";
 import { poorResponseChecklist, type ReassessmentInput } from "@/data/reassessmentRules";
 import { resistanceRiskLabels } from "@/data/resistanceRules";
 import { buildRecommendation, unsupportedConditions } from "@/lib/clinicalEngine";
@@ -272,6 +275,7 @@ export default function NavigatorApp() {
           <p>非定型病原体カバー条件：市中肺炎、重症肺炎、旅行歴、集団発生、レジオネラ疑いで検討します。</p>
           <p>培養後の狭域化候補：菌種・感受性・感染巣・臨床経過からde-escalationを検討してください。</p>
         </div>
+        <AntibioticReferenceCards />
       </section>
 
       <section className="step-block">
@@ -369,6 +373,109 @@ export default function NavigatorApp() {
         <p className="safety-note final">このサマリーは診断・処方の確定ではありません。臨床状況と合わせて判断してください。</p>
       </section>
     </main>
+  );
+}
+
+function AntibioticReferenceCards() {
+  return (
+    <div className="antibiotic-reference">
+      <div className="reference-heading">
+        <span>Reference</span>
+        <h3>抗菌薬クラスカード・薬剤カード</h3>
+        <p>国内承認適応と臨床ガイドライン上の使用は区別し、施設アンチバイオグラム、PMDA電子添文、最新ガイドラインを確認してください。</p>
+      </div>
+      {antibioticClasses.map((antibioticClass) => {
+        const classDrugs = antibiotics.filter((drug) => drug.classId === antibioticClass.id);
+        return (
+          <details key={antibioticClass.id} className="class-accordion">
+            <summary>
+              <span>{antibioticClass.name}</span>
+              <small>{antibioticClass.pkpdIndex}</small>
+            </summary>
+            <div className="class-detail">
+              <p>{antibioticClass.mechanism}</p>
+              <div className="class-grid">
+                <InfoBlock label="代表薬" values={antibioticClass.representativeDrugs} />
+                <InfoBlock label="得意な菌" values={antibioticClass.strongOrganisms} />
+                <InfoBlock label="原則効かない菌" values={antibioticClass.generallyNotEffective} />
+                <InfoBlock label="主な耐性機序" values={antibioticClass.resistanceMechanisms} />
+                <InfoBlock label="重要な副作用" values={antibioticClass.importantAdverseEffects} />
+                <InfoBlock label="重要な相互作用" values={antibioticClass.importantInteractions} />
+              </div>
+              <p className="micro-note">{antibioticClass.stewardshipPosition}</p>
+              <p className="micro-note">{antibioticClass.clinicalPearl}</p>
+              <div className="drug-card-list">
+                {classDrugs.map((drug) => (
+                  <article key={drug.id} className="drug-card">
+                    <div>
+                      <strong>{drug.genericName}</strong>
+                      <span>{drug.brandNames.join(" / ")} | {drug.route}</span>
+                    </div>
+                    <TagRow drug={drug} />
+                    {drug.safetyAlerts.length > 0 && <p className="drug-alert">{drug.safetyAlerts.join(" / ")}</p>}
+                    <div className="drug-grid">
+                      <InfoBlock label="主なスペクトラム" values={drug.mainSpectrum} />
+                      <InfoBlock label="原則・注意" values={drug.cautions} />
+                      <InfoBlock label="組織移行性" values={[
+                        `髄液: ${drug.tissuePenetration.csf}`,
+                        `肺: ${drug.tissuePenetration.lung}`,
+                        `胆汁: ${drug.tissuePenetration.bile}`,
+                        `尿路: ${drug.tissuePenetration.urine}`,
+                        `前立腺: ${drug.tissuePenetration.prostate}`,
+                        `骨: ${drug.tissuePenetration.bone}`,
+                      ]} />
+                      <InfoBlock label="ESBL / AmpC" values={[drug.esblPosition, drug.ampCPosition]} />
+                      <InfoBlock label="副作用" values={drug.majorAdverseEffects} />
+                      <InfoBlock label="相互作用" values={drug.interactions} />
+                      <InfoBlock label="国内承認適応" values={drug.domesticApprovedIndications} />
+                      <InfoBlock label="適正使用上の位置付け" values={[drug.guidelinePosition]} />
+                    </div>
+                    {drugInteractions
+                      .filter((interaction) => interaction.drugIds.includes(drug.id))
+                      .map((interaction) => (
+                        <p key={interaction.id} className={`interaction ${interaction.severity}`}>
+                          {interaction.message}
+                        </p>
+                      ))}
+                    <p className="source-line">出典: {drug.sources.join(" / ")} | 情報確認日: {drug.checkedAt}</p>
+                  </article>
+                ))}
+              </div>
+              <p className="source-line">クラス出典: {antibioticClass.sources.join(" / ")} | 情報確認日: {antibioticClass.checkedAt}</p>
+            </div>
+          </details>
+        );
+      })}
+    </div>
+  );
+}
+
+function InfoBlock({ label, values }: { label: string; values: string[] }) {
+  return (
+    <div className="info-block">
+      <span>{label}</span>
+      <p>{values.join(" / ")}</p>
+    </div>
+  );
+}
+
+function TagRow({ drug }: { drug: ReturnType<typeof buildRecommendation>["selectedCandidates"][number] }) {
+  const tags = [
+    drug.activity.mrsa === "あり" ? "MRSA" : "",
+    drug.activity.pseudomonas === "あり" ? "緑膿菌" : "",
+    drug.activity.anaerobes === "あり" ? "嫌気性菌" : "",
+    drug.activity.atypicals === "あり" ? "非定型菌" : "",
+    drug.renalAdjustment.includes("必要") || drug.renalAdjustment.includes("確認") ? "腎調整" : "",
+    drug.tdm.includes("TDM対象") || (drug.tdm.includes("TDM") && drug.tdm.includes("AUC")) ? "TDM" : "",
+    drug.tissuePenetration.csf === "良好" ? "髄液移行" : "",
+  ].filter(Boolean);
+
+  return (
+    <div className="tag-row">
+      {tags.map((tag) => (
+        <span key={tag}>{tag}</span>
+      ))}
+    </div>
   );
 }
 

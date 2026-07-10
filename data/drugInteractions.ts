@@ -1,0 +1,58 @@
+import type { DrugInteraction } from "@/types/antibiotics";
+
+export const drugInteractions: DrugInteraction[] = [
+  {
+    id: "carbapenem-valproate",
+    drugIds: ["meropenem", "doripenem"],
+    interactingDrug: "バルプロ酸ナトリウム",
+    severity: "contraindicated",
+    message: "カルバペネム系とバルプロ酸は併用禁忌です。バルプロ酸濃度低下により発作再燃リスクがあります。",
+    source: "PMDA電子添文",
+    checkedAt: "2026-07-10",
+  },
+  {
+    id: "clarithromycin-suvorexant",
+    drugIds: ["clarithromycin"],
+    interactingDrug: "スボレキサント",
+    severity: "contraindicated",
+    message: "クラリスロマイシンとスボレキサントは併用禁忌です。CYP3A阻害による曝露増加を確認してください。",
+    source: "PMDA電子添文",
+    checkedAt: "2026-07-10",
+  },
+  {
+    id: "macrolide-qt",
+    drugIds: ["azithromycin", "clarithromycin"],
+    interactingDrug: "QT延長を来し得る薬剤",
+    severity: "caution",
+    message: "マクロライド使用時はQT延長、電解質異常、体液量、併用薬を確認します。",
+    source: "PMDA電子添文",
+    checkedAt: "2026-07-10",
+  },
+  {
+    id: "vancomycin-nephrotoxic",
+    drugIds: ["vancomycin"],
+    interactingDrug: "腎毒性を来し得る薬剤",
+    severity: "caution",
+    message: "バンコマイシンでは腎機能再評価、TDM、薬剤師相談を検討します。",
+    source: "抗菌薬TDM臨床実践ガイドライン、PMDA電子添文",
+    checkedAt: "2026-07-10",
+  },
+  {
+    id: "linezolid-serotonergic",
+    drugIds: ["linezolid"],
+    interactingDrug: "セロトニン作動薬",
+    severity: "caution",
+    message: "リネゾリドではセロトニン症候群、血球減少、視神経障害を確認します。",
+    source: "PMDA電子添文",
+    checkedAt: "2026-07-10",
+  },
+  {
+    id: "tetracycline-cations",
+    drugIds: ["doxycycline", "minocycline"],
+    interactingDrug: "多価陽イオン含有製剤",
+    severity: "caution",
+    message: "テトラサイクリン系は金属カチオンで吸収低下し得るため服用タイミングを確認します。",
+    source: "PMDA電子添文",
+    checkedAt: "2026-07-10",
+  },
+];
