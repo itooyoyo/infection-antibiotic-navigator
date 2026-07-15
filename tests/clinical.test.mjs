@@ -3,6 +3,8 @@ import { test } from "node:test";
 import { scoreResistanceRisk } from "../data/resistanceRules.ts";
 import { calculateRenalFunction } from "../data/renalDoseRules.ts";
 import { assessReassessment } from "../data/reassessmentRules.ts";
+import { infectionProfiles } from "../data/infections.ts";
+import { pathogenProfiles } from "../data/pathogens.ts";
 
 const baseContext = {
   healthcareAssociated: false,
@@ -131,4 +133,30 @@ test("用量不足疑い", () => {
 test("培養判明後の狭域化", () => {
   const reassessment = assessReassessment({ ...baseReassessment, cultureKnown: true, susceptibilityKnown: true });
   assert.equal(reassessment.ivToOralReady, true);
+});
+
+test("蜂窩織炎はβ溶血性レンサ球菌を優先し肺炎球菌を標準表示しない", () => {
+  const cellulitis = pathogenProfiles.cellulitis;
+  assert.deepEqual(
+    cellulitis.filter((item) => item.tier === "priority").map((item) => item.name),
+    ["Streptococcus pyogenes（A群溶血性レンサ球菌）", "その他β溶血性レンサ球菌（B・C・G群など）"],
+  );
+  assert.equal(cellulitis.find((item) => item.name === "肺炎球菌")?.tier, "missable");
+  assert.ok(!infectionProfiles.find((item) => item.id === "cellulitis").suspectedPathogenIds.includes("streptococcus-pneumoniae"));
+});
+
+test("全感染症にSource Controlと反応不良時の共通再評価項目がある", () => {
+  const required = ["診断違い", "膿瘍", "閉塞", "耐性菌", "投与量", "組織移行", "感染源コントロール"];
+  for (const profile of infectionProfiles) {
+    assert.ok(profile.sourceControl.length > 0, `${profile.label}: source control`);
+    for (const term of required) {
+      assert.ok(profile.reassessmentPoints.some((item) => item.includes(term)), `${profile.label}: ${term}`);
+    }
+  }
+});
+
+test("皮下膿瘍は切開排膿を標準とし抗菌薬をroutineに表示しない", () => {
+  const abscess = infectionProfiles.find((item) => item.id === "abscess");
+  assert.deepEqual(abscess.standardCandidateIds, []);
+  assert.ok(abscess.sourceControl.some((item) => item.includes("切開排膿")));
 });

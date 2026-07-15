@@ -77,12 +77,19 @@ export function buildRecommendation(params: {
   const reassessment = assessReassessment(params.reassessment);
 
   const standardIds = resistance.level === "high" ? infection.severeCandidateIds : infection.standardCandidateIds;
+  const mrsaEligible = ["hap", "cellulitis", "abscess", "bacteremiaUnknown"].includes(params.infectionId);
+  const healthcareMrsaRisk =
+    params.infectionId === "hap" || params.infectionId === "bacteremiaUnknown"
+      ? params.context.dialysis || params.context.centralVenousCatheter
+      : false;
+  const esblEligible = ["hap", "pyelonephritis", "complicatedUti", "cholangitis", "cholecystitis", "intraAbdominal", "bacteremiaUnknown"].includes(
+    params.infectionId,
+  );
   const candidateIds = Array.from(
     new Set([
       ...standardIds,
-      ...(params.context.mrsaHistory || params.context.dialysis || params.context.centralVenousCatheter ? ["vancomycin"] : []),
-      ...(params.context.esblHistory || params.context.creHistory ? ["meropenem"] : []),
-      ...(params.context.aspirationRisk && params.infectionId !== "cap" ? ["ampicillinSulbactam"] : []),
+      ...(mrsaEligible && (params.context.mrsaHistory || healthcareMrsaRisk) ? ["vancomycin"] : []),
+      ...(esblEligible && params.context.esblHistory ? ["meropenem"] : []),
     ]),
   );
 
