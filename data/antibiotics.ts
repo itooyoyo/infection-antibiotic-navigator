@@ -1,10 +1,10 @@
 import type { Antibiotic } from "@/types/clinical";
 
-const checkedAt = "2026-07-10";
+const checkedAt = "2026-07-17";
 const pmdaSource = "PMDA電子添文";
 const guideSource = "JAID/JSC感染症治療ガイド2023";
-const idsaSource = "IDSA耐性菌ガイダンス";
-const tdmSource = "抗菌薬TDM臨床実践ガイドライン";
+const idsaSource = "IDSA 2024 AMR Gram-negative Guidance";
+const tdmSource = "抗菌薬TDM臨床実践ガイドライン2022";
 
 function dosing(tdmRequired = "不要候補") {
   return {
@@ -231,7 +231,7 @@ export const antibiotics: Antibiotic[] = [
     id: "ampicillinSulbactam",
     genericName: "アンピシリン・スルバクタム",
     brandNames: ["ユナシン-S"],
-    classId: "other",
+    classId: "beta-lactamase-inhibitor-penicillins",
     drugClass: "βラクタマーゼ阻害薬配合ペニシリン",
     route: "静注",
     mainSpectrum: ["肺炎球菌", "口腔内嫌気性菌", "MSSA", "一部の腸内細菌目"],
@@ -376,7 +376,7 @@ export const antibiotics: Antibiotic[] = [
     id: "linezolid",
     genericName: "リネゾリド",
     brandNames: ["ザイボックス"],
-    classId: "other",
+    classId: "anti-mrsa-others",
     drugClass: "オキサゾリジノン系",
     route: "静注・経口",
     mainSpectrum: ["MRSA", "VRE候補", "グラム陽性菌"],
@@ -434,7 +434,7 @@ export const antibiotics: Antibiotic[] = [
     id: "doxycycline",
     genericName: "ドキシサイクリン",
     brandNames: ["ビブラマイシン"],
-    classId: "other",
+    classId: "tetracyclines",
     drugClass: "テトラサイクリン系",
     route: "経口",
     mainSpectrum: ["非定型病原体", "一部のグラム陽性菌", "一部のMRSA"],
@@ -521,7 +521,7 @@ export const antibiotics: Antibiotic[] = [
     id: "metronidazole",
     genericName: "メトロニダゾール",
     brandNames: ["フラジール"],
-    classId: "beta-lactamase-inhibitor-penicillins",
+    classId: "nitroimidazoles",
     drugClass: "ニトロイミダゾール系",
     route: "経口・静注",
     mainSpectrum: ["嫌気性菌"],
@@ -550,7 +550,7 @@ export const antibiotics: Antibiotic[] = [
     id: "clindamycin",
     genericName: "クリンダマイシン",
     brandNames: ["ダラシン"],
-    classId: "anti-mrsa-others",
+    classId: "lincosamides",
     drugClass: "リンコマイシン系",
     route: "経口・静注",
     mainSpectrum: ["連鎖球菌", "一部のブドウ球菌", "嫌気性菌"],
@@ -579,7 +579,7 @@ export const antibiotics: Antibiotic[] = [
     id: "levofloxacin",
     genericName: "レボフロキサシン",
     brandNames: ["クラビット"],
-    classId: "tetracyclines",
+    classId: "fluoroquinolones",
     drugClass: "ニューキノロン系",
     route: "経口・静注",
     mainSpectrum: ["一部のグラム陰性桿菌", "非定型病原体", "肺炎球菌"],

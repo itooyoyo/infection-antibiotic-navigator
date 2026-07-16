@@ -8,7 +8,31 @@ export type AntibioticClassId =
   | "glycopeptides"
   | "anti-mrsa-others"
   | "tetracyclines"
-  | "macrolides";
+  | "macrolides"
+  | "fluoroquinolones"
+  | "lincosamides"
+  | "nitroimidazoles"
+  | "sulfonamides";
+
+export type AntibioticReasoning = {
+  drugId: string;
+  why: string[];
+  cautions: string[];
+  conclusion: string;
+};
+
+export type AlternativeReasoning = {
+  drugId: string;
+  drugName: string;
+  reasons: string[];
+};
+
+export type AntibioticReasoningResult = {
+  selected: AntibioticReasoning[];
+  alternatives: AlternativeReasoning[];
+  sourceControl: string[];
+  renalWarnings: string[];
+};
 
 export type PkPdIndex = "%fT>MIC" | "AUC/MIC" | "Cmax/MIC" | "AUC/MIC または Cmax/MIC" | "薬剤ごとに確認";
 

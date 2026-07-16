@@ -564,6 +564,79 @@ dd {
   padding-top: 16px;
 }
 
+.drug-card > summary,
+.reasoning-accordion > summary {
+  cursor: pointer;
+  list-style: none;
+}
+
+.drug-card > summary::-webkit-details-marker,
+.reasoning-accordion > summary::-webkit-details-marker {
+  display: none;
+}
+
+.drug-card > summary {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  min-width: 0;
+}
+
+.drug-card > summary::after,
+.reasoning-accordion > summary::after {
+  content: "+";
+  color: var(--cyan);
+  font-weight: 800;
+}
+
+.drug-card[open] > summary::after,
+.reasoning-accordion[open] > summary::after {
+  content: "−";
+}
+
+.drug-card-content {
+  padding-top: 10px;
+}
+
+.reasoning-accordion {
+  margin-top: 14px;
+  border-top: 1px solid rgba(126, 210, 255, 0.2);
+  padding-top: 10px;
+}
+
+.reasoning-accordion > summary {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  color: var(--cyan);
+  font-weight: 800;
+}
+
+.reasoning-accordion > div {
+  padding: 12px 0 2px;
+  color: #d8ebf5;
+  line-height: 1.6;
+  overflow-wrap: anywhere;
+}
+
+.reasoning-accordion ul {
+  margin: 8px 0 10px;
+  padding-left: 1.2rem;
+}
+
+.reasoning-conclusion {
+  color: #e7fff5;
+  font-weight: 700;
+}
+
+.alternative-reasoning {
+  margin: 20px 0;
+}
+
+.alternative-reasoning section + section {
+  margin-top: 14px;
+}
+
 .drug-card strong {
   display: block;
   color: #f8fcff;
@@ -706,6 +779,11 @@ dd {
     align-items: flex-start;
     flex-direction: column;
     gap: 6px;
+  }
+
+  .drug-card > summary {
+    align-items: flex-start;
+    flex-direction: column;
   }
 
   .class-accordion > summary small {

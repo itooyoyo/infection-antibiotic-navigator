@@ -9,6 +9,8 @@ import { infectionProfiles } from "@/data/infections";
 import { poorResponseChecklist, type ReassessmentInput } from "@/data/reassessmentRules";
 import { resistanceRiskLabels } from "@/data/resistanceRules";
 import { buildRecommendation, unsupportedConditions } from "@/lib/clinicalEngine";
+import { getAntibioticReasoning } from "@/lib/getAntibioticReasoning";
+import type { AntibioticReasoning } from "@/types/antibiotics";
 import type { InfectionId, PatientContext, RenalInput } from "@/types/clinical";
 
 const redFlagItems = [
@@ -107,6 +109,7 @@ const guideMessages: Record<string, string> = {
   step0: "まずRed Flagと感染源コントロールを確認します。",
   step2: "耐性菌リスクは過去の培養歴も重要です。",
   step4: "広域化する条件と、狭域化する条件を分けて考えましょう。",
+  explain: "なぜこの薬が候補なのか、条件ごとに整理します。",
   step5: "腎機能に応じた用量と投与間隔を確認します。",
   step7: "反応不良時は、膿瘍や用量不足も再確認しましょう。",
 };
@@ -157,6 +160,18 @@ export default function NavigatorApp() {
   const result = useMemo(
     () => buildRecommendation({ infectionId, context, redFlags, sourceControl, renalInput: renal, reassessment }),
     [infectionId, context, redFlags, sourceControl, renal, reassessment],
+  );
+  const reasoning = useMemo(
+    () =>
+      getAntibioticReasoning({
+        infectionId,
+        context,
+        severity,
+        selectedDrugs: Array.from(new Map([...result.standardCandidates, ...result.severeCandidates, ...result.alternativeCandidates].map((drug) => [drug.id, drug])).values()),
+        sourceControl,
+        renal: result.renal,
+      }),
+    [infectionId, context, severity, sourceControl, result.standardCandidates, result.severeCandidates, result.alternativeCandidates, result.renal],
   );
 
   return (
@@ -260,10 +275,24 @@ export default function NavigatorApp() {
         <p className="culture-note">培養採取により治療開始が危険に遅れる場合を除き、可能な範囲で抗菌薬投与前に採取を検討する。</p>
         <div className="culture-row">{result.infection.firstCultures.map((item) => <span key={item}>{item}</span>)}</div>
         <div className="candidate-layout">
-          <CandidateColumn title="標準候補" drugs={result.standardCandidates} />
-          <CandidateColumn title="重症例候補" drugs={result.severeCandidates} />
-          <CandidateColumn title="代替候補" drugs={result.alternativeCandidates} />
+          <CandidateColumn title="標準候補" drugs={result.standardCandidates} reasoning={reasoning.selected} />
+          <CandidateColumn title="重症例候補" drugs={result.severeCandidates} reasoning={reasoning.selected} />
+          <CandidateColumn title="代替候補" drugs={result.alternativeCandidates} reasoning={reasoning.selected} />
         </div>
+        <GuideCharacter message={guideMessages.explain} />
+        <details className="reasoning-accordion alternative-reasoning">
+          <summary>なぜ他の薬ではない？</summary>
+          <div>
+            {reasoning.alternatives.map((item) => (
+              <section key={item.drugId}>
+                <strong>{item.drugName}を自動優先しない理由</strong>
+                <ul>{item.reasons.map((reason) => <li key={reason}>{reason}</li>)}</ul>
+              </section>
+            ))}
+            {reasoning.sourceControl.map((item) => <p key={item}>{item}</p>)}
+            {reasoning.renalWarnings.map((item) => <p key={item}>{item}</p>)}
+          </div>
+        </details>
         <div className="rules-panel">
           <p>βラクタムアレルギー時：アレルギーの型と重症度を確認し、専門家・薬剤師相談を検討してください。</p>
           <p>MRSAカバー追加条件：MRSA既往、透析、長期療養、デバイス、重症院内感染で検討します。</p>
@@ -402,16 +431,28 @@ function AntibioticReferenceCards() {
               <p className="micro-note">{antibioticClass.stewardshipPosition}</p>
               <p className="micro-note">{antibioticClass.clinicalPearl}</p>
               <div className="drug-card-list">
-                {classDrugs.map((drug) => (
-                  <article key={drug.id} className="drug-card">
-                    <div>
+                {classDrugs.map((drug) => {
+                  const classCard = antibioticClasses.find((item) => item.id === drug.classId);
+                  const notCovered = [
+                    drug.activity.mrsa === "なし" ? "MRSA" : "",
+                    drug.activity.pseudomonas === "なし" ? "緑膿菌" : "",
+                    drug.activity.anaerobes === "なし" ? "嫌気性菌" : "",
+                    drug.activity.atypicals === "なし" ? "非定型病原体" : "",
+                    drug.cautions.find((item) => item.includes("腸球菌")) ? "腸球菌" : "",
+                  ].filter(Boolean);
+                  return (
+                  <details key={drug.id} className="drug-card">
+                    <summary>
                       <strong>{drug.genericName}</strong>
                       <span>{drug.brandNames.join(" / ")} | {drug.route}</span>
-                    </div>
-                    <TagRow drug={drug} />
-                    {drug.safetyAlerts.length > 0 && <p className="drug-alert">{drug.safetyAlerts.join(" / ")}</p>}
-                    <div className="drug-grid">
+                    </summary>
+                    <div className="drug-card-content">
+                      <TagRow drug={drug} />
+                      {drug.safetyAlerts.length > 0 && <p className="drug-alert">{drug.safetyAlerts.join(" / ")}</p>}
+                      <div className="drug-grid">
+                      <InfoBlock label="作用機序 / PK・PD" values={[classCard?.mechanism ?? "クラス情報を確認", classCard?.pkpdIndex ?? "薬剤ごとに確認"]} />
                       <InfoBlock label="主なスペクトラム" values={drug.mainSpectrum} />
+                      <InfoBlock label="原則カバーしない" values={notCovered.length ? notCovered : ["薬剤・感受性ごとに確認"]} />
                       <InfoBlock label="原則・注意" values={drug.cautions} />
                       <InfoBlock label="組織移行性" values={[
                         `髄液: ${drug.tissuePenetration.csf}`,
@@ -421,11 +462,13 @@ function AntibioticReferenceCards() {
                         `前立腺: ${drug.tissuePenetration.prostate}`,
                         `骨: ${drug.tissuePenetration.bone}`,
                       ]} />
-                      <InfoBlock label="ESBL / AmpC" values={[drug.esblPosition, drug.ampCPosition]} />
+                      <InfoBlock label="ESBL / AmpC / CRE" values={[drug.esblPosition, drug.ampCPosition, drug.id === "meropenem" ? "CREでは通常のカルバペネムが無効となる可能性があります。" : "CREには感受性確認なしで期待しません。"]} />
+                      <InfoBlock label="腎・肝機能 / TDM" values={[drug.renalAdjustment, drug.hepaticAdjustment, drug.tdm, `透析：${drug.dosing.postDialysis}`]} />
                       <InfoBlock label="副作用" values={drug.majorAdverseEffects} />
                       <InfoBlock label="相互作用" values={drug.interactions} />
                       <InfoBlock label="国内承認適応" values={drug.domesticApprovedIndications} />
                       <InfoBlock label="適正使用上の位置付け" values={[drug.guidelinePosition]} />
+                      <InfoBlock label="Clinical Pearl" values={[classCard?.clinicalPearl ?? drug.guidelinePosition]} />
                     </div>
                     {drugInteractions
                       .filter((interaction) => interaction.drugIds.includes(drug.id))
@@ -435,8 +478,9 @@ function AntibioticReferenceCards() {
                         </p>
                       ))}
                     <p className="source-line">出典: {drug.sources.join(" / ")} | 情報確認日: {drug.checkedAt}</p>
-                  </article>
-                ))}
+                    </div>
+                  </details>
+                )})}
               </div>
               <p className="source-line">クラス出典: {antibioticClass.sources.join(" / ")} | 情報確認日: {antibioticClass.checkedAt}</p>
             </div>
@@ -476,7 +520,7 @@ function TagRow({ drug }: { drug: ReturnType<typeof buildRecommendation>["select
   );
 }
 
-function CandidateColumn({ title, drugs }: { title: string; drugs: ReturnType<typeof buildRecommendation>["standardCandidates"] }) {
+function CandidateColumn({ title, drugs, reasoning }: { title: string; drugs: ReturnType<typeof buildRecommendation>["standardCandidates"]; reasoning: AntibioticReasoning[] }) {
   return (
     <div className="candidate-column">
       <h3>{title}</h3>
@@ -493,6 +537,20 @@ function CandidateColumn({ title, drugs }: { title: string; drugs: ReturnType<ty
           <p>再評価時期：48-72時間後</p>
           <p>参照情報：{drug.sources.join(" / ")}</p>
           <p>情報確認日：{drug.pmdaCheckedAt}</p>
+          {(() => {
+            const explanation = reasoning.find((item) => item.drugId === drug.id);
+            return explanation ? (
+              <details className="reasoning-accordion">
+                <summary>なぜこの薬？</summary>
+                <div>
+                  <strong>{drug.genericName}を候補とする理由</strong>
+                  <ul>{explanation.why.map((item) => <li key={item}>{item}</li>)}</ul>
+                  {explanation.cautions.map((item) => <p key={item}>{item}</p>)}
+                  <p className="reasoning-conclusion">結論：{explanation.conclusion}</p>
+                </div>
+              </details>
+            ) : null;
+          })()}
           <details>
             <summary>用量表示</summary>
             <dl>
