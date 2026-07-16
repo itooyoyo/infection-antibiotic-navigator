@@ -7,6 +7,8 @@ import { infectionProfiles } from "../data/infections.ts";
 import { pathogenProfiles } from "../data/pathogens.ts";
 import { antibiotics } from "../data/antibiotics.ts";
 import { getAntibioticReasoning } from "../lib/getAntibioticReasoning.ts";
+import { getAdministrationInstructions } from "../lib/getAdministrationInstructions.ts";
+import { getRenalDoseRecommendation } from "../lib/getRenalDoseRecommendation.ts";
 
 const baseContext = {
   healthcareAssociated: false,
@@ -228,4 +230,80 @@ test("カルバペネム候補はバルプロ酸相互作用を表示", () => {
 test("改善なしでは広域化だけでなくSource Controlと用量を再評価", () => {
   assert.ok(poorResponseChecklist.some((item) => item.includes("感染源コントロール")));
   assert.ok(poorResponseChecklist.some((item) => item.includes("投与量")));
+});
+
+const renalAt = (crcl, category = "normal") => ({ bmi: 22, egfrJapanese: crcl, crclCockcroftGault: crcl, idealBodyWeight: 60, adjustedBodyWeight: 60, usedWeight: 60, usedWeightLabel: "実体重", category, warnings: [], rationale: "test" });
+const doseFor = ({ drugId = "daptomycin", indication = "深在性皮膚感染症", crcl = 60, renalInput = baseRenal, category = "normal" } = {}) =>
+  getRenalDoseRecommendation({ drugId, indication, renal: renalAt(crcl, category), renalInput });
+
+test("セフトリアキソンはカルシウム含有輸液との配合注意を表示", () => {
+  assert.match(getAdministrationInstructions("ceftriaxone", "セフトリアキソン").calciumCompatibility, /配合しない/);
+});
+
+test("バンコマイシンは投与時間・腎調整・TDM・腎毒性を表示", () => {
+  const administration = getAdministrationInstructions("vancomycin", "バンコマイシン");
+  const drug = antibiotics.find((item) => item.id === "vancomycin");
+  assert.match(administration.infusionTime, /60分以上/);
+  assert.match(drug.renalAdjustment, /調整/);
+  assert.match(drug.tdm, /TDM|AUC/);
+  assert.ok(drug.cautions.some((item) => item.includes("腎毒性")));
+});
+
+test("ダプトマイシンは確認済み溶解・希釈液を表示", () => {
+  const administration = getAdministrationInstructions("daptomycin", "ダプトマイシン");
+  assert.match(administration.reconstitution, /生理食塩液7mL/);
+  assert.match(administration.dilution, /生理食塩液/);
+  assert.match(administration.dextrose5, /配合不適/);
+});
+
+test("プレミックス製剤へ不要な再溶解を指示しない", () => {
+  const administration = getAdministrationInstructions("linezolid", "リネゾリド");
+  assert.equal(administration.reconstitution, "不要");
+  assert.match(administration.preparation, /調製不要/);
+});
+
+test("CrCl 60は通常腎機能区分", () => {
+  assert.equal(doseFor({ crcl: 60 }).category, "CrCl 50 mL/min以上");
+  assert.equal(doseFor({ crcl: 60 }).interval, "24時間ごと");
+});
+
+test("CrCl 35は対応する維持量・間隔候補", () => {
+  const dose = doseFor({ crcl: 35, category: "moderate" });
+  assert.equal(dose.category, "CrCl 30～49 mL/min");
+  assert.equal(dose.maintenanceDose, "4mg/kg");
+  assert.equal(dose.interval, "24時間ごと");
+});
+
+test("CrCl 15は高度腎機能低下の用量候補", () => {
+  const dose = doseFor({ crcl: 15, category: "severe" });
+  assert.equal(dose.maintenanceDose, "4mg/kg");
+  assert.equal(dose.interval, "48時間ごと");
+});
+
+test("AKIは推算値の信頼性警告", () => {
+  const dose = doseFor({ crcl: 35, category: "unstable", renalInput: { ...baseRenal, stableRenalFunction: false, aki: true } });
+  assert.ok(dose.warnings.some((item) => item.includes("非定常状態")));
+  assert.match(dose.maintenanceDose, /具体的用量は/);
+});
+
+test("HDは透析後投与確認を表示", () => {
+  const dose = doseFor({ crcl: 8, category: "dialysis", renalInput: { ...baseRenal, dialysis: true, hemodialysis: true } });
+  assert.match(dose.dialysis, /透析後/);
+});
+
+test("CRRTは単一用量を断定しない", () => {
+  const dose = doseFor({ crcl: 8, category: "dialysis", renalInput: { ...baseRenal, dialysis: true, crrt: true } });
+  assert.match(dose.dialysis, /単一用量を断定せず/);
+});
+
+test("出典不明の用量は数値を表示しない", () => {
+  const dose = doseFor({ drugId: "cefazolin", indication: "蜂窩織炎", crcl: 35, category: "moderate" });
+  assert.match(dose.maintenanceDose, /具体的用量は/);
+  assert.equal(dose.source, "確認条件不足");
+});
+
+test("フラッシュ根拠不明でも不要と表示しない", () => {
+  const administration = getAdministrationInstructions("cefazolin", "セファゾリン");
+  assert.match(administration.preFlush, /薬剤部へ確認/);
+  assert.ok(!administration.preFlush.includes("不要"));
 });

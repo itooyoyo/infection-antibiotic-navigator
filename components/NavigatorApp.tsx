@@ -10,6 +10,8 @@ import { poorResponseChecklist, type ReassessmentInput } from "@/data/reassessme
 import { resistanceRiskLabels } from "@/data/resistanceRules";
 import { buildRecommendation, unsupportedConditions } from "@/lib/clinicalEngine";
 import { getAntibioticReasoning } from "@/lib/getAntibioticReasoning";
+import { getAdministrationInstructions } from "@/lib/getAdministrationInstructions";
+import { getRenalDoseRecommendation } from "@/lib/getRenalDoseRecommendation";
 import type { AntibioticReasoning } from "@/types/antibiotics";
 import type { InfectionId, PatientContext, RenalInput } from "@/types/clinical";
 
@@ -301,7 +303,7 @@ export default function NavigatorApp() {
           <p>非定型病原体カバー条件：市中肺炎、重症肺炎、旅行歴、集団発生、レジオネラ疑いで検討します。</p>
           <p>培養後の狭域化候補：菌種・感受性・感染巣・臨床経過からde-escalationを検討してください。</p>
         </div>
-        <AntibioticReferenceCards />
+        <AntibioticReferenceCards renal={result.renal} renalInput={renal} infectionId={infectionId} />
       </section>
 
       <section className="step-block">
@@ -344,6 +346,26 @@ export default function NavigatorApp() {
         </div>
         <p className="micro-note">{result.renal.rationale}</p>
         {result.renal.warnings.map((warning) => <p key={warning} className="warning-line">{warning}</p>)}
+        <p className="culture-note">本表示は用量確認を支援する参考情報です。感染部位、重症度、病原体、MIC、腎機能の推移、透析条件、採用製剤、最新添付文書、院内プロトコルを確認してください。</p>
+        <div className="dose-guidance-list">
+          {result.selectedCandidates.map((drug) => {
+            const dose = getRenalDoseRecommendation({ drugId: drug.id, indication: doseIndication(drug.id, infectionId), renal: result.renal, renalInput: renal });
+            return (
+              <details key={drug.id} className="reasoning-accordion">
+                <summary>{drug.genericName}：腎機能別用量確認</summary>
+                <div className="dose-guidance-grid">
+                  <InfoBlock label="腎機能評価" values={[dose.category, `CrCl ${dose.crcl ?? "算出不能"} mL/min`, `eGFR ${result.renal.egfrJapanese ?? "算出不能"}`, `${result.renal.usedWeightLabel} ${result.renal.usedWeight ?? "-"} kg`, renal.stableRenalFunction ? "腎機能は安定入力" : "腎機能は非定常入力"]} />
+                  <InfoBlock label="維持量・間隔" values={[dose.maintenanceDose, dose.interval, dose.infusionTime]} />
+                  <InfoBlock label="初回負荷量" values={[dose.loadingDose]} />
+                  <InfoBlock label="HD / PD / CRRT" values={[dose.dialysis]} />
+                  <InfoBlock label="TDM" values={[dose.tdm]} />
+                  <InfoBlock label="出典" values={[dose.source, `確認日 ${dose.checkedAt}`]} />
+                  {dose.warnings.map((warning) => <p key={warning} className="warning-line">{warning}</p>)}
+                </div>
+              </details>
+            );
+          })}
+        </div>
         <p className="culture-note">施設採用薬、院内プロトコル、最新添付文書を確認してください。</p>
       </section>
 
@@ -402,7 +424,13 @@ export default function NavigatorApp() {
   );
 }
 
-function AntibioticReferenceCards() {
+function doseIndication(drugId: string, infectionId: InfectionId) {
+  if (drugId === "daptomycin") return ["cellulitis", "abscess"].includes(infectionId) ? "深在性皮膚感染症" : "敗血症・右心系感染性心内膜炎";
+  if (drugId === "linezolid") return "MRSA・VRE適応感染症";
+  return infectionProfiles.find((item) => item.id === infectionId)?.label ?? "適応未指定";
+}
+
+function AntibioticReferenceCards({ renal, renalInput, infectionId }: { renal: ReturnType<typeof buildRecommendation>["renal"]; renalInput: RenalInput; infectionId: InfectionId }) {
   return (
     <div className="antibiotic-reference">
       <div className="reference-heading">
@@ -433,6 +461,8 @@ function AntibioticReferenceCards() {
               <div className="drug-card-list">
                 {classDrugs.map((drug) => {
                   const classCard = antibioticClasses.find((item) => item.id === drug.classId);
+                  const administration = getAdministrationInstructions(drug.id, drug.genericName);
+                  const renalDose = getRenalDoseRecommendation({ drugId: drug.id, indication: doseIndication(drug.id, infectionId), renal, renalInput });
                   const notCovered = [
                     drug.activity.mrsa === "なし" ? "MRSA" : "",
                     drug.activity.pseudomonas === "なし" ? "緑膿菌" : "",
@@ -470,6 +500,23 @@ function AntibioticReferenceCards() {
                       <InfoBlock label="適正使用上の位置付け" values={[drug.guidelinePosition]} />
                       <InfoBlock label="Clinical Pearl" values={[classCard?.clinicalPearl ?? drug.guidelinePosition]} />
                     </div>
+                    {drug.route.includes("静注") && (
+                      <details className="administration-accordion">
+                        <summary>Administration：投与・調製・腎用量</summary>
+                        <div className="administration-flow">
+                          <InfoBlock label="投与方法" values={[administration.route, administration.preparation]} />
+                          <InfoBlock label="溶解" values={[administration.reconstitution, `注射用水：${administration.sterileWater}`, `生理食塩液：${administration.normalSaline}`]} />
+                          <InfoBlock label="希釈" values={[administration.dilution, administration.concentration, `5%ブドウ糖液：${administration.dextrose5}`]} />
+                          <InfoBlock label="投与時間" values={[administration.infusionTime, administration.rapidInjection]} />
+                          <InfoBlock label="ルート" values={[administration.sameLine, `Y-site：${administration.ySite}`, `専用ルート：${administration.dedicatedLine}`]} />
+                          <InfoBlock label="前後フラッシュ" values={[`前：${administration.preFlush}`, `後：${administration.postFlush}`, `使用液：${administration.flushFluid}`]} />
+                          <div className="administration-danger"><InfoBlock label="配合禁止・注意" values={[administration.calciumCompatibility, ...administration.incompatibleFluids, ...administration.incompatibleDrugs]} /></div>
+                          <InfoBlock label="腎機能別用量" values={[renalDose.category, renalDose.maintenanceDose, renalDose.interval, renalDose.infusionTime, renalDose.dialysis]} />
+                          <InfoBlock label="TDM" values={[renalDose.tdm]} />
+                          <InfoBlock label="出典・確認日" values={[administration.source, administration.checkedAt, renalDose.source, renalDose.checkedAt]} />
+                        </div>
+                      </details>
+                    )}
                     {drugInteractions
                       .filter((interaction) => interaction.drugIds.includes(drug.id))
                       .map((interaction) => (

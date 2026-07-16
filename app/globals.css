@@ -637,6 +637,38 @@ dd {
   margin-top: 14px;
 }
 
+.administration-accordion {
+  margin-top: 18px;
+  border-top: 1px solid rgba(126, 210, 255, 0.26);
+  padding-top: 12px;
+}
+
+.administration-accordion > summary {
+  cursor: pointer;
+  color: var(--cyan);
+  font-weight: 800;
+  overflow-wrap: anywhere;
+}
+
+.administration-flow,
+.dose-guidance-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 12px;
+  margin-top: 12px;
+  min-width: 0;
+}
+
+.administration-danger {
+  border-left: 3px solid var(--pink);
+  padding-left: 10px;
+  background: rgba(255, 79, 158, 0.08);
+}
+
+.dose-guidance-list {
+  margin-top: 14px;
+}
+
 .drug-card strong {
   display: block;
   color: #f8fcff;
@@ -801,6 +833,11 @@ dd {
   .candidate-layout,
   .summary-grid,
   .renal-results {
+    grid-template-columns: 1fr;
+  }
+
+  .administration-flow,
+  .dose-guidance-grid {
     grid-template-columns: 1fr;
   }
 }

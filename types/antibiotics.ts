@@ -34,6 +34,72 @@ export type AntibioticReasoningResult = {
   renalWarnings: string[];
 };
 
+export type IvAdministration = {
+  drugId: string;
+  genericName: string;
+  product: string;
+  route: string;
+  preparation: string;
+  reconstitution: string;
+  dilution: string;
+  concentration: string;
+  infusionTime: string;
+  rapidInjection: string;
+  normalSaline: string;
+  dextrose5: string;
+  sterileWater: string;
+  incompatibleFluids: string[];
+  incompatibleDrugs: string[];
+  calciumCompatibility: string;
+  sameLine: string;
+  ySite: string;
+  dedicatedLine: string;
+  preFlush: string;
+  postFlush: string;
+  flushFluid: string;
+  lightProtection: string;
+  stability: string;
+  storage: string;
+  source: string;
+  checkedAt: string;
+  notes: string[];
+};
+
+export type RenalDoseRule = {
+  drugId: string;
+  indication: string;
+  route: string;
+  crclMin: number | null;
+  crclMax: number | null;
+  maintenanceDose: string;
+  interval: string;
+  infusionTime: string;
+  loadingDose: string;
+  hemodialysis: string;
+  peritonealDialysis: string;
+  crrt: string;
+  postDialysis: string;
+  tdm: string;
+  source: string;
+  checkedAt: string;
+  domesticApproved: boolean;
+};
+
+export type RenalDoseRecommendation = {
+  category: string;
+  crcl: number | null;
+  normalDose: string;
+  maintenanceDose: string;
+  interval: string;
+  infusionTime: string;
+  loadingDose: string;
+  dialysis: string;
+  tdm: string;
+  warnings: string[];
+  source: string;
+  checkedAt: string;
+};
+
 export type PkPdIndex = "%fT>MIC" | "AUC/MIC" | "Cmax/MIC" | "AUC/MIC または Cmax/MIC" | "薬剤ごとに確認";
 
 export type SpectrumPosition = "あり" | "なし" | "限定的" | "薬剤ごとに確認" | "感受性確認が必要";
