@@ -1,0 +1,57 @@
+import type { InfectionProfile } from "./infections.ts";
+import type { InfectionId } from "../types/clinical.ts";
+
+const checkedAt = "2026-07-17";
+const reassessment = ["診断再考（診断違い）", "耐性菌", "膿瘍", "閉塞", "感染源コントロール不足", "用量不足", "投与量不足", "組織移行不足", "真菌", "抗酸菌", "非感染症"];
+
+type Seed = {
+  id: InfectionId; label: string; group: string; pathogens: string[];
+  standard: string[]; severe: string[]; alternative: string[];
+  cultures: string[]; imaging: string[]; source: string[]; references: string[];
+  severity?: string; deEscalation?: string[]; reassessment?: string[];
+};
+
+function profile(seed: Seed): InfectionProfile {
+  return {
+    id: seed.id, name: seed.label, label: seed.label, group: seed.group,
+    suspectedPathogenIds: seed.pathogens,
+    severeRiskFactors: ["ショック・臓器障害", "免疫不全", "急速進行", "感染源コントロール困難"],
+    redFlags: ["ショック・臓器障害", "急速進行", "意識障害・神経脱落症状"],
+    requiredCultures: seed.cultures,
+    imaging: seed.imaging,
+    sourceControl: seed.source,
+    empiricAntibioticCandidateIds: { standard: seed.standard, severe: seed.severe, alternative: seed.alternative },
+    reassessmentPoints: seed.reassessment ?? reassessment,
+    severityCue: seed.severity ?? "ショック、臓器障害、急速進行、免疫不全では緊急評価と専門科相談を検討します。",
+    firstCultures: seed.cultures,
+    standardCandidateIds: seed.standard,
+    severeCandidateIds: seed.severe,
+    alternativeCandidateIds: seed.alternative,
+    deEscalation: seed.deEscalation ?? ["菌種・感受性、感染巣、臨床反応、source controlを確認し、不要なMRSA・緑膿菌・嫌気性菌カバーを中止して最狭域の有効薬へ変更します。"],
+    reference: seed.references,
+    checkedAt,
+  };
+}
+
+export const expandedInfectionProfiles: InfectionProfile[] = [
+  profile({ id: "bacterialMeningitis", label: "細菌性髄膜炎", group: "中枢神経", pathogens: ["streptococcus-pneumoniae", "neisseria-meningitidis", "listeria-monocytogenes"], standard: ["vancomycin", "ceftriaxone"], severe: ["vancomycin", "ceftriaxone", "ampicillin"], alternative: ["vancomycin", "cefepime", "meropenem"], cultures: ["血液培養2セット", "髄液Gram染色・培養・細胞数・糖・蛋白（禁忌がなければ）"], imaging: ["局在神経症状、乳頭浮腫、免疫不全、意識障害などでは腰椎穿刺前CTを検討"], source: ["副鼻腔炎・中耳炎・乳様突起炎など連続感染源を評価", "脳外科術後の感染デバイスは抜去・交換を脳外科と検討"], references: ["IDSA Bacterial Meningitis Guideline 2004", "WHO guidelines on meningitis diagnosis, treatment and care 2025"], severity: "抗菌薬を遅らせない。18〜50歳はVCM＋CTRX（またはCTX）、50歳以上・免疫不全はABPCを追加。脳外科術後はVCM＋CFPMまたはMEPMを検討。", reassessment: ["病原体・MIC判明後の狭域化", "ABPC継続要否", "デキサメタゾン継続要否", ...reassessment] }),
+  profile({ id: "brainAbscess", label: "脳膿瘍", group: "中枢神経", pathogens: ["streptococcus-pyogenes", "bacteroides", "staphylococcus-aureus"], standard: ["ceftriaxone", "metronidazole"], severe: ["ceftriaxone", "metronidazole", "vancomycin"], alternative: ["meropenem", "vancomycin"], cultures: ["血液培養", "穿刺・手術検体の好気/嫌気培養、病理"], imaging: ["造影MRI（DWIを含む）", "造影CT"], source: ["可能なら定位穿刺吸引または切除", "歯性・耳鼻科・心内膜炎など原発巣を治療"], references: ["ESCMID Brain Abscess Guideline 2024"] }),
+  profile({ id: "ventriculitis", label: "脳室炎", group: "中枢神経", pathogens: ["cons", "mrsa", "pseudomonas-aeruginosa"], standard: ["vancomycin", "cefepime"], severe: ["vancomycin", "meropenem"], alternative: ["vancomycin", "ceftazidime"], cultures: ["髄液培養（抗菌薬前、可能ならデバイスから）", "血液培養"], imaging: ["造影MRI＋DWI"], source: ["感染した髄液シャント・ドレーンの完全抜去と一時的体外ドレナージを検討"], references: ["IDSA Healthcare-Associated Ventriculitis and Meningitis Guideline 2017"] }),
+  profile({ id: "vpShuntInfection", label: "VPシャント感染", group: "中枢神経", pathogens: ["cons", "mrsa", "pseudomonas-aeruginosa"], standard: ["vancomycin", "cefepime"], severe: ["vancomycin", "meropenem"], alternative: ["vancomycin", "ceftazidime"], cultures: ["シャント髄液培養", "血液培養"], imaging: ["造影MRI＋DWI", "腹部症状時は腹部超音波またはCT"], source: ["感染シャントを完全抜去し体外ドレナージ＋静注抗菌薬を検討"], references: ["IDSA Healthcare-Associated Ventriculitis and Meningitis Guideline 2017"] }),
+  profile({ id: "vap", label: "VAP", group: "呼吸器", pathogens: ["pseudomonas-aeruginosa", "mrsa", "klebsiella-pneumoniae"], standard: ["cefepime", "piperacillinTazobactam"], severe: ["cefepime", "vancomycin"], alternative: ["meropenem", "linezolid"], cultures: ["気管吸引または下気道検体培養", "血液培養"], imaging: ["胸部X線", "胸部CT（合併症・診断不確実時）"], source: ["膿胸は胸腔ドレナージ", "不要な侵襲的デバイスの抜去・交換を評価"], references: ["ATS/IDSA HAP/VAP Guideline 2016"] }),
+  profile({ id: "lungAbscess", label: "肺膿瘍", group: "呼吸器", pathogens: ["streptococcus-pyogenes", "bacteroides", "staphylococcus-aureus"], standard: ["ampicillinSulbactam"], severe: ["piperacillinTazobactam", "vancomycin"], alternative: ["ceftriaxone", "metronidazole"], cultures: ["血液培養", "良質な下気道検体（可能時）"], imaging: ["造影胸部CT"], source: ["気道閉塞・異物・腫瘍を検索", "内科治療不応や巨大病変では経皮/外科ドレナージを専門科と検討"], references: ["ERS/ESICM/ESCMID/ALAT Severe CAP Guideline 2023", "IDSA SSTI Guideline 2014（膿瘍原則）"] }),
+  profile({ id: "empyema", label: "膿胸", group: "呼吸器", pathogens: ["streptococcus-pneumoniae", "staphylococcus-aureus", "bacteroides"], standard: ["ampicillinSulbactam"], severe: ["piperacillinTazobactam", "vancomycin"], alternative: ["ceftriaxone", "metronidazole"], cultures: ["胸水pH・糖・LDH・Gram染色・好気/嫌気培養", "血液培養"], imaging: ["胸部超音波", "造影胸部CT"], source: ["適応があれば速やかな胸腔ドレナージ", "隔壁化・残存腔では胸腔内治療またはVATSを呼吸器外科と検討"], references: ["British Thoracic Society Pleural Disease Guideline 2023"] }),
+  profile({ id: "necrotizingFasciitis", label: "壊死性筋膜炎", group: "皮膚軟部組織", pathogens: ["streptococcus-pyogenes", "mrsa", "bacteroides"], standard: ["vancomycin", "piperacillinTazobactam", "clindamycin"], severe: ["vancomycin", "meropenem", "clindamycin"], alternative: ["linezolid", "ceftriaxone", "metronidazole"], cultures: ["血液培養", "手術時深部組織Gram染色・好気/嫌気培養"], imaging: ["画像で手術を遅らせない", "範囲評価にCT/MRI"], source: ["疑った時点で緊急外科コンサルト・試験切開/徹底的デブリードマン", "24〜36時間後以降も反復デブリードマンを評価"], references: ["IDSA SSTI Guideline 2014"] }),
+  profile({ id: "diabeticFootInfection", label: "糖尿病足感染", group: "皮膚軟部組織", pathogens: ["staphylococcus-aureus", "streptococcus-pyogenes", "escherichia-coli"], standard: ["ampicillinSulbactam"], severe: ["piperacillinTazobactam", "vancomycin"], alternative: ["ceftriaxone", "metronidazole"], cultures: ["デブリードマン後の深部組織培養", "骨髄炎疑いでは骨培養"], imaging: ["単純X線", "骨髄炎が不明確ならMRI", "血流評価"], source: ["壊死組織デブリードマン、膿瘍ドレナージ", "虚血評価と血行再建、除圧・創傷管理"], references: ["IWGDF/IDSA Diabetic Foot Infection Guideline 2023"] }),
+  profile({ id: "obstructivePyelonephritis", label: "閉塞性腎盂腎炎", group: "尿路", pathogens: ["escherichia-coli", "klebsiella-pneumoniae", "proteus"], standard: ["ceftriaxone"], severe: ["piperacillinTazobactam"], alternative: ["cefepime", "meropenem"], cultures: ["尿培養", "血液培養"], imaging: ["尿路超音波", "単純または造影CTを腎機能に応じ検討"], source: ["尿管ステントまたは腎瘻による緊急尿路ドレナージ", "結石・閉塞原因の definitive treatment"], references: ["EAU Urological Infections Guideline 2026", "IDSA Complicated UTI Guideline 2025"] }),
+  profile({ id: "cauti", label: "CAUTI", group: "尿路", pathogens: ["escherichia-coli", "pseudomonas-aeruginosa", "enterococcus"], standard: ["ceftriaxone"], severe: ["cefepime", "piperacillinTazobactam"], alternative: ["meropenem", "levofloxacin"], cultures: ["交換後/新規カテーテルから尿培養", "重症時は血液培養"], imaging: ["閉塞・結石・膿瘍疑いで超音波/CT"], source: ["不要な尿道カテーテルを抜去", "2週間以上留置し継続必要なら交換を検討"], references: ["IDSA CAUTI Guideline 2009", "EAU Urological Infections Guideline 2026"] }),
+  profile({ id: "appendicitis", label: "虫垂炎", group: "胆道・腹腔内", pathogens: ["escherichia-coli", "bacteroides"], standard: ["ceftriaxone", "metronidazole"], severe: ["piperacillinTazobactam"], alternative: ["cefmetazole", "meropenem"], cultures: ["複雑性/重症例は術中腹腔内培養", "重症時は血液培養"], imaging: ["造影CT", "超音波（状況に応じて）"], source: ["虫垂切除", "膿瘍形成ではドレナージ/待機手術を外科と検討"], references: ["WSES Jerusalem Appendicitis Guideline 2020", "IDSA Complicated Intra-abdominal Infection Update 2024"] }),
+  profile({ id: "diverticulitis", label: "憩室炎", group: "胆道・腹腔内", pathogens: ["escherichia-coli", "bacteroides"], standard: ["ceftriaxone", "metronidazole"], severe: ["piperacillinTazobactam"], alternative: ["cefmetazole", "meropenem"], cultures: ["ドレナージ/手術検体培養", "重症時は血液培養"], imaging: ["造影CT"], source: ["大きな膿瘍は画像下ドレナージ", "汎発性腹膜炎・穿孔は緊急外科評価"], references: ["WSES Acute Colonic Diverticulitis Guideline 2020", "IDSA Complicated Intra-abdominal Infection Update 2024"] }),
+  profile({ id: "peritonitis", label: "腹膜炎", group: "胆道・腹腔内", pathogens: ["escherichia-coli", "bacteroides", "enterococcus"], standard: ["ceftriaxone", "metronidazole"], severe: ["piperacillinTazobactam"], alternative: ["cefepime", "metronidazole", "meropenem"], cultures: ["腹水細胞数・分画・培養（血液培養ボトルへ接種）", "血液培養"], imaging: ["造影CT", "腹部超音波"], source: ["二次性腹膜炎では穿孔修復・切除・洗浄・ドレナージ", "PD関連ではカテーテル抜去適応を評価"], references: ["IDSA Complicated Intra-abdominal Infection Update 2024", "ISPD Peritonitis Guideline 2022"] }),
+  profile({ id: "liverAbscess", label: "肝膿瘍", group: "胆道・腹腔内", pathogens: ["klebsiella-pneumoniae", "escherichia-coli", "bacteroides"], standard: ["ceftriaxone", "metronidazole"], severe: ["piperacillinTazobactam"], alternative: ["meropenem"], cultures: ["血液培養", "穿刺膿の好気/嫌気培養"], imaging: ["造影CTまたは超音波"], source: ["経皮的穿刺吸引またはドレナージ", "胆道閉塞・腹腔内原発巣を治療"], references: ["Tokyo Guidelines 2018", "IDSA Complicated Intra-abdominal Infection Update 2024"] }),
+  profile({ id: "sepsis", label: "敗血症", group: "血流", pathogens: ["staphylococcus-aureus", "escherichia-coli", "pseudomonas-aeruginosa"], standard: ["ceftriaxone"], severe: ["cefepime", "vancomycin"], alternative: ["piperacillinTazobactam", "meropenem"], cultures: ["血液培養2セット", "推定感染巣培養"], imaging: ["感染源に応じた迅速画像評価"], source: ["解剖学的診断後、実行可能な限り速やかにsource control", "感染デバイス抜去、膿瘍/閉塞ドレナージ、壊死組織除去"], references: ["Surviving Sepsis Campaign 2021", "日本版敗血症診療ガイドライン2024"] }),
+  profile({ id: "infectiveEndocarditis", label: "感染性心内膜炎", group: "血流", pathogens: ["staphylococcus-aureus", "streptococcus-pyogenes", "enterococcus"], standard: ["vancomycin", "ceftriaxone"], severe: ["vancomycin", "cefepime"], alternative: ["ampicillin", "ceftriaxone"], cultures: ["異なる穿刺部位から血液培養3セットを抗菌薬前に採取（治療を危険に遅らせない）"], imaging: ["経胸壁心エコー", "疑いが高い/人工弁/デバイスでは経食道心エコー"], source: ["心不全、制御不能感染、塞栓予防の手術適応をハートチームで評価", "感染心臓デバイスは完全抜去を評価"], references: ["ESC Infective Endocarditis Guideline 2023", "AHA Scientific Statement 2015"] }),
+  profile({ id: "osteomyelitis", label: "骨髄炎", group: "骨関節", pathogens: ["staphylococcus-aureus", "streptococcus-pyogenes", "escherichia-coli"], standard: ["cefazolin"], severe: ["vancomycin", "ceftriaxone"], alternative: ["cefepime"], cultures: ["血液培養", "骨生検/手術骨培養（可能なら抗菌薬前）"], imaging: ["単純X線", "MRI"], source: ["壊死骨・膿瘍のデブリードマン", "感染人工物の温存/抜去を整形外科と評価"], references: ["IWGDF/IDSA DFI Guideline 2023", "IDSA Vertebral Osteomyelitis Guideline 2015"] }),
+  profile({ id: "septicArthritis", label: "化膿性関節炎", group: "骨関節", pathogens: ["staphylococcus-aureus", "streptococcus-pyogenes"], standard: ["cefazolin"], severe: ["vancomycin", "ceftriaxone"], alternative: ["cefepime"], cultures: ["抗菌薬前の関節穿刺：細胞数、結晶、Gram染色・培養", "血液培養"], imaging: ["超音波", "単純X線", "深部関節/骨髄炎評価にMRI"], source: ["関節穿刺排液または関節鏡/切開洗浄", "排液不良・臨床不応では再洗浄を評価"], references: ["SANJO Guideline 2023"] }),
+  profile({ id: "vertebralOsteomyelitis", label: "化膿性脊椎炎", group: "骨関節", pathogens: ["staphylococcus-aureus", "streptococcus-pyogenes", "escherichia-coli"], standard: ["cefazolin"], severe: ["vancomycin", "ceftriaxone"], alternative: ["vancomycin", "cefepime"], cultures: ["血液培養2セット", "血液培養陰性なら画像ガイド下生検"], imaging: ["脊椎MRI（造影を検討）"], source: ["進行する神経障害、変形、不安定性、大きな硬膜外膿瘍では緊急脊椎外科評価", "持続菌血症・疼痛不応では手術適応を評価"], references: ["IDSA Native Vertebral Osteomyelitis Guideline 2015"] }),
+];

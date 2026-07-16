@@ -104,7 +104,7 @@ export type PkPdIndex = "%fT>MIC" | "AUC/MIC" | "Cmax/MIC" | "AUC/MIC または 
 
 export type SpectrumPosition = "あり" | "なし" | "限定的" | "薬剤ごとに確認" | "感受性確認が必要";
 
-export type TissuePenetration = "良好" | "中等度" | "限定的" | "通常選択しない" | "薬剤ごとに確認" | "初期版対象外";
+export type TissuePenetration = "良好" | "炎症時良好" | "中等度" | "限定的" | "通常選択しない" | "薬剤ごとに確認" | "初期版対象外";
 
 export type AntibioticClassCard = {
   id: AntibioticClassId;

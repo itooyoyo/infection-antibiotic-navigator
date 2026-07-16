@@ -7,13 +7,11 @@ import { calculateRenalFunction } from "@/data/renalDoseRules";
 import { assessReassessment, type ReassessmentInput } from "@/data/reassessmentRules";
 import type { Antibiotic } from "@/types/clinical";
 import { findSourceControlRules } from "@/data/sourceControl";
+import { pathogens as pathogenCatalog } from "@/data/pathogens";
 
 export const unsupportedConditions = [
   "小児",
   "妊婦",
-  "髄膜炎",
-  "感染性心内膜炎",
-  "骨髄炎",
   "好中球減少性発熱",
   "結核",
   "真菌症",
@@ -33,7 +31,28 @@ export function getAntibiotics(ids: string[]) {
 }
 
 export function getPathogens(id: InfectionId) {
-  return pathogenProfiles[id] ?? [];
+  const prepared = pathogenProfiles[id];
+  if (prepared) return prepared;
+  const infection = infectionProfiles.find((item) => item.id === id);
+  const supplementalNames: Record<string, string> = {
+    "neisseria-meningitidis": "Neisseria meningitidis（髄膜炎菌）",
+    "listeria-monocytogenes": "Listeria monocytogenes",
+    cons: "CoNS（コアグラーゼ陰性ブドウ球菌）",
+  };
+  return (infection?.suspectedPathogenIds ?? []).map((pathogenId, index) => {
+    const pathogen = pathogenCatalog.find((item) => item.id === pathogenId);
+    return {
+      name: pathogen?.name ?? supplementalNames[pathogenId] ?? pathogenId,
+      tier: index === 0 ? "priority" as const : index === 1 ? "additional" as const : "missable" as const,
+      why: index === 0 ? "この病型で優先して評価します。" : "患者背景・感染経路・培養結果に応じて追加評価します。",
+      increasedBy: pathogen?.riskFactors.join("、") ?? "病型別背景を確認",
+      tests: pathogen?.recommendedTests.join("、") ?? "感染巣培養と感受性検査",
+      betaLactamGap: pathogenId === "listeria-monocytogenes" ? "セフェム系は無効です。" : "薬剤感受性と感染部位を確認",
+      intracellular: pathogen?.intracellular ?? false,
+      anaerobe: pathogen?.oxygenRequirement === "嫌気性",
+      resistanceRisk: pathogen?.resistanceProne ?? "菌種・施設疫学で評価",
+    };
+  });
 }
 
 export function evaluateRedFlags(redFlags: RedFlagState, infectionId: InfectionId) {
@@ -77,12 +96,12 @@ export function buildRecommendation(params: {
   const reassessment = assessReassessment(params.reassessment);
 
   const standardIds = resistance.level === "high" ? infection.severeCandidateIds : infection.standardCandidateIds;
-  const mrsaEligible = ["hap", "cellulitis", "abscess", "bacteremiaUnknown"].includes(params.infectionId);
+  const mrsaEligible = ["hap", "vap", "cellulitis", "abscess", "necrotizingFasciitis", "diabeticFootInfection", "bacteremiaUnknown", "sepsis", "ventriculitis", "vpShuntInfection", "infectiveEndocarditis", "osteomyelitis", "septicArthritis", "vertebralOsteomyelitis"].includes(params.infectionId);
   const healthcareMrsaRisk =
-    params.infectionId === "hap" || params.infectionId === "bacteremiaUnknown"
+    ["hap", "vap", "bacteremiaUnknown", "sepsis", "ventriculitis", "vpShuntInfection"].includes(params.infectionId)
       ? params.context.dialysis || params.context.centralVenousCatheter
       : false;
-  const esblEligible = ["hap", "pyelonephritis", "complicatedUti", "cholangitis", "cholecystitis", "intraAbdominal", "bacteremiaUnknown"].includes(
+  const esblEligible = ["hap", "vap", "pyelonephritis", "complicatedUti", "obstructivePyelonephritis", "cauti", "cholangitis", "cholecystitis", "intraAbdominal", "appendicitis", "diverticulitis", "peritonitis", "liverAbscess", "bacteremiaUnknown", "sepsis"].includes(
     params.infectionId,
   );
   const candidateIds = Array.from(

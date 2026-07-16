@@ -1,4 +1,5 @@
 import type { InfectionId } from "@/types/clinical";
+import { expandedInfectionProfiles } from "./infectionExpansions.ts";
 
 export type InfectionProfile = {
   id: InfectionId;
@@ -33,6 +34,7 @@ const amrReference = "IDSA 2024 AMR Gram-negative Guidance";
 const reassessmentCore = ["診断違い", "膿瘍・膿胸", "閉塞", "耐性菌・培養結果", "投与量・投与間隔不足", "組織移行不足", "感染源コントロール不足"];
 
 export const infectionProfiles: InfectionProfile[] = [
+  ...expandedInfectionProfiles,
   {
     id: "cap",
     name: "市中肺炎",

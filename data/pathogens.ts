@@ -358,7 +358,7 @@ function note(id: string, tier: PathogenNote["tier"], why: string): PathogenNote
   };
 }
 
-export const pathogenProfiles: Record<InfectionId, PathogenNote[]> = {
+export const pathogenProfiles: Partial<Record<InfectionId, PathogenNote[]>> = {
   cap: [
     note("streptococcus-pneumoniae", "priority", "市中肺炎で優先して考える菌です。"),
     note("haemophilus-influenzae", "priority", "慢性気道疾患や高齢で候補になります。"),

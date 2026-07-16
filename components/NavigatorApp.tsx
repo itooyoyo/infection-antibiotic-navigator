@@ -6,6 +6,7 @@ import { antibioticClasses } from "@/data/antibioticClasses";
 import { antibiotics } from "@/data/antibiotics";
 import { drugInteractions } from "@/data/drugInteractions";
 import { infectionProfiles } from "@/data/infections";
+import { infectionDecisionSupport } from "@/data/infectionDecisionSupport";
 import { poorResponseChecklist, type ReassessmentInput } from "@/data/reassessmentRules";
 import { resistanceRiskLabels } from "@/data/resistanceRules";
 import { buildRecommendation, unsupportedConditions } from "@/lib/clinicalEngine";
@@ -276,10 +277,28 @@ export default function NavigatorApp() {
         <GuideCharacter message={guideMessages.step4} />
         <p className="culture-note">培養採取により治療開始が危険に遅れる場合を除き、可能な範囲で抗菌薬投与前に採取を検討する。</p>
         <div className="culture-row">{result.infection.firstCultures.map((item) => <span key={item}>{item}</span>)}</div>
+        <div className="rules-panel">
+          <p><strong>画像：</strong>{result.infection.imaging.join(" / ")}</p>
+          <p><strong>病型別Source Control：</strong>{result.infection.sourceControl.join(" / ")}</p>
+          <p><strong>48〜72時間後：</strong>{result.infection.reassessmentPoints.join(" / ")}</p>
+          <p><strong>de-escalation：</strong>{result.infection.deEscalation.join(" / ")}</p>
+          <p><strong>参考ガイドライン：</strong>{result.infection.reference.join(" / ")}</p>
+        </div>
         <div className="candidate-layout">
           <CandidateColumn title="標準候補" drugs={result.standardCandidates} reasoning={reasoning.selected} />
           <CandidateColumn title="重症例候補" drugs={result.severeCandidates} reasoning={reasoning.selected} />
           <CandidateColumn title="代替候補" drugs={result.alternativeCandidates} reasoning={reasoning.selected} />
+        </div>
+        <div className="rules-panel decision-support-panel">
+          <h3>原因菌の優先順位・追加カバー条件</h3>
+          <ol>{infectionDecisionSupport[infectionId].pathogenPriority.map((item) => <li key={item}>{item}</li>)}</ol>
+          <p><strong>MRSA：</strong>{infectionDecisionSupport[infectionId].mrsa}</p>
+          <p><strong>緑膿菌：</strong>{infectionDecisionSupport[infectionId].pseudomonas}</p>
+          <p><strong>ESBL：</strong>{infectionDecisionSupport[infectionId].esbl}</p>
+          <p><strong>AmpC：</strong>{infectionDecisionSupport[infectionId].ampC}</p>
+          <p><strong>CRE：</strong>{infectionDecisionSupport[infectionId].cre}</p>
+          <p><strong>嫌気性菌：</strong>{infectionDecisionSupport[infectionId].anaerobes}</p>
+          {infectionDecisionSupport[infectionId].adjuncts?.map((item) => <p key={item} className="clinical-adjunct">{item}</p>)}
         </div>
         <GuideCharacter message={guideMessages.explain} />
         <details className="reasoning-accordion alternative-reasoning">
@@ -387,6 +406,7 @@ export default function NavigatorApp() {
       <section className="step-block">
         <StepHeading step="Step 7" title="48-72時間後の再評価" lead="反応不良時は診断、感染源、投与設計、組織移行性を順番に見直します。" />
         <GuideCharacter message={guideMessages.step7} />
+        <div className="rules-panel"><ol>{result.infection.reassessmentPoints.map((item) => <li key={item}>{item}</li>)}</ol></div>
         <div className="toggle-grid">
           {reassessmentLabels.map(([key, label]) => (
             <ToggleButton key={key} label={label} active={reassessment[key]} onClick={() => setReassessment({ ...reassessment, [key]: !reassessment[key] })} />
@@ -485,7 +505,7 @@ function AntibioticReferenceCards({ renal, renalInput, infectionId }: { renal: R
                       <InfoBlock label="原則カバーしない" values={notCovered.length ? notCovered : ["薬剤・感受性ごとに確認"]} />
                       <InfoBlock label="原則・注意" values={drug.cautions} />
                       <InfoBlock label="組織移行性" values={[
-                        `髄液: ${drug.tissuePenetration.csf}`,
+                        `髄液: ${csfPenetrationLabel(drug.id, drug.tissuePenetration.csf)}`,
                         `肺: ${drug.tissuePenetration.lung}`,
                         `胆汁: ${drug.tissuePenetration.bile}`,
                         `尿路: ${drug.tissuePenetration.urine}`,
@@ -511,6 +531,7 @@ function AntibioticReferenceCards({ renal, renalInput, infectionId }: { renal: R
                           <InfoBlock label="ルート" values={[administration.sameLine, `Y-site：${administration.ySite}`, `専用ルート：${administration.dedicatedLine}`]} />
                           <InfoBlock label="前後フラッシュ" values={[`前：${administration.preFlush}`, `後：${administration.postFlush}`, `使用液：${administration.flushFluid}`]} />
                           <div className="administration-danger"><InfoBlock label="配合禁止・注意" values={[administration.calciumCompatibility, ...administration.incompatibleFluids, ...administration.incompatibleDrugs]} /></div>
+                          <InfoBlock label="遮光・保存" values={[`遮光：${administration.lightProtection}`, `安定性：${administration.stability}`, `保存：${administration.storage}`]} />
                           <InfoBlock label="腎機能別用量" values={[renalDose.category, renalDose.maintenanceDose, renalDose.interval, renalDose.infusionTime, renalDose.dialysis]} />
                           <InfoBlock label="TDM" values={[renalDose.tdm]} />
                           <InfoBlock label="出典・確認日" values={[administration.source, administration.checkedAt, renalDose.source, renalDose.checkedAt]} />
@@ -536,6 +557,12 @@ function AntibioticReferenceCards({ renal, renalInput, infectionId }: { renal: R
       })}
     </div>
   );
+}
+
+function csfPenetrationLabel(drugId: string, fallback: string) {
+  if (["ceftriaxone", "cefepime", "ceftazidime", "meropenem", "vancomycin", "ampicillin"].includes(drugId)) return "炎症時良好";
+  if (["daptomycin", "cefazolin", "metronidazole", "clindamycin"].includes(drugId)) return "通常選択しない";
+  return fallback === "初期版対象外" ? "薬剤ごとに確認" : fallback;
 }
 
 function InfoBlock({ label, values }: { label: string; values: string[] }) {

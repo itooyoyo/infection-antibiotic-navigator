@@ -1,16 +1,36 @@
 export type InfectionId =
+  | "bacterialMeningitis"
+  | "brainAbscess"
+  | "ventriculitis"
+  | "vpShuntInfection"
   | "cap"
   | "hap"
+  | "vap"
   | "aspirationPneumonia"
+  | "lungAbscess"
+  | "empyema"
+  | "necrotizingFasciitis"
+  | "diabeticFootInfection"
   | "lowerUti"
   | "pyelonephritis"
   | "complicatedUti"
+  | "obstructivePyelonephritis"
+  | "cauti"
   | "cholangitis"
   | "cholecystitis"
   | "intraAbdominal"
+  | "appendicitis"
+  | "diverticulitis"
+  | "peritonitis"
+  | "liverAbscess"
   | "cellulitis"
   | "abscess"
-  | "bacteremiaUnknown";
+  | "bacteremiaUnknown"
+  | "sepsis"
+  | "infectiveEndocarditis"
+  | "osteomyelitis"
+  | "septicArthritis"
+  | "vertebralOsteomyelitis";
 
 export type RiskLevel = "low" | "moderate" | "high";
 

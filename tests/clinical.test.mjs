@@ -307,3 +307,29 @@ test("フラッシュ根拠不明でも不要と表示しない", () => {
   assert.match(administration.preFlush, /薬剤部へ確認/);
   assert.ok(!administration.preFlush.includes("不要"));
 });
+
+test("要求された32感染症を網羅する", () => {
+  const required = ["細菌性髄膜炎", "脳膿瘍", "脳室炎", "VPシャント感染", "市中肺炎", "院内肺炎", "VAP", "誤嚥関連肺炎", "肺膿瘍", "膿胸", "蜂窩織炎", "皮下膿瘍", "壊死性筋膜炎", "糖尿病足感染", "膀胱炎", "腎盂腎炎", "複雑性尿路感染", "閉塞性腎盂腎炎", "CAUTI", "胆管炎", "胆嚢炎", "腹腔内感染", "虫垂炎", "憩室炎", "腹膜炎", "肝膿瘍", "菌血症", "敗血症", "感染性心内膜炎", "骨髄炎", "化膿性関節炎", "化膿性脊椎炎"];
+  assert.equal(infectionProfiles.length, required.length);
+  for (const label of required) assert.ok(infectionProfiles.some((item) => item.label === label), label);
+});
+
+test("成人細菌性髄膜炎の年齢別・術後経験的治療と補助療法を保持する", () => {
+  const meningitis = infectionProfiles.find((item) => item.id === "bacterialMeningitis");
+  assert.deepEqual(meningitis.standardCandidateIds, ["vancomycin", "ceftriaxone"]);
+  assert.ok(meningitis.severeCandidateIds.includes("ampicillin"));
+  assert.ok(meningitis.alternativeCandidateIds.includes("cefepime"));
+  assert.ok(meningitis.alternativeCandidateIds.includes("meropenem"));
+  assert.ok(meningitis.reassessmentPoints.some((item) => item.includes("デキサメタゾン")));
+});
+
+test("新規感染症も培養・画像・Source Control・再評価・狭域化・出典を持つ", () => {
+  for (const item of infectionProfiles) {
+    assert.ok(item.firstCultures.length, `${item.label}: culture`);
+    assert.ok(item.imaging.length, `${item.label}: imaging`);
+    assert.ok(item.sourceControl.length, `${item.label}: source control`);
+    assert.ok(item.reassessmentPoints.some((value) => value.includes("診断違い")), `${item.label}: reassessment`);
+    assert.ok(item.deEscalation.length, `${item.label}: de-escalation`);
+    assert.ok(item.reference.length, `${item.label}: reference`);
+  }
+});
