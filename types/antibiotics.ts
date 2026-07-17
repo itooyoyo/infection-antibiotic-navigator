@@ -98,6 +98,42 @@ export type RenalDoseRecommendation = {
   warnings: string[];
   source: string;
   checkedAt: string;
+  adjustmentReason?: string;
+  renalMetric?: string;
+  evidenceDetails?: string[];
+};
+
+export type EvidenceRenalBand = {
+  min: number | null;
+  max: number | null;
+  dose: string;
+  interval: string;
+  infusionTime: string;
+  reason: string;
+};
+
+export type EvidenceAntibioticDose = {
+  antibioticId: string;
+  indication: string;
+  route: string;
+  severity: "通常" | "重症" | "髄膜炎専用";
+  renalMetric: "Cockcroft-Gault CCr" | "CLcr" | "TDM";
+  normalDose: string;
+  loadingDose: string;
+  renalBands: EvidenceRenalBand[];
+  hd: string;
+  pd: string;
+  crrt: string;
+  tdm: string;
+  maximumDose: string;
+  pediatric: string;
+  pregnancy: string;
+  lactation: string;
+  source: string;
+  document: string;
+  version: string;
+  verifiedAt: string;
+  domesticApproved: boolean;
 };
 
 export type PkPdIndex = "%fT>MIC" | "AUC/MIC" | "Cmax/MIC" | "AUC/MIC または Cmax/MIC" | "薬剤ごとに確認";

@@ -431,13 +431,13 @@ export default function NavigatorApp() {
                   <InfoBlock label="1. なぜ候補か" values={explanation?.why ?? ["感染症・推定病原体・患者背景から候補化"]} />
                   <InfoBlock label="2. 対象起因菌" values={drug.targetOrganisms.length ? drug.targetOrganisms : result.pathogens.map((item) => item.name)} />
                   <InfoBlock label="3. 通常用量" values={[dose.normalDose]} />
-                  <InfoBlock label="4. 患者の腎機能" values={[`Cockcroft–Gault CCr ${dose.crcl ?? "算出不能"} mL/min`, `日本人eGFR ${result.renal.egfrJapanese ?? "算出不能"} mL/min/1.73m²`, `absolute eGFR ${result.renal.egfrAbsolute ?? "算出不能"} mL/min`, `${result.renal.usedWeightLabel} ${result.renal.usedWeight ?? "-"} kg`, `用量判定指標：Cockcroft–Gault CCr（当該ルールの出典基準）`, dose.category]} />
+                  <InfoBlock label="4. 患者の腎機能" values={[`Cockcroft–Gault CCr ${dose.crcl ?? "算出不能"} mL/min`, `日本人eGFR ${result.renal.egfrJapanese ?? "算出不能"} mL/min/1.73m²`, `absolute eGFR ${result.renal.egfrAbsolute ?? "算出不能"} mL/min`, `${result.renal.usedWeightLabel} ${result.renal.usedWeight ?? "-"} kg`, `用量判定指標：${dose.renalMetric ?? "Cockcroft–Gault CCr"}`, dose.category]} />
                   <InfoBlock label="5. 腎機能調整後の維持量候補" values={[dose.maintenanceDose]} />
                   <InfoBlock label="6. 初回負荷量" values={[dose.loadingDose]} />
-                  <InfoBlock label="7. 投与間隔" values={[dose.interval]} />
+                  <InfoBlock label="7. 腎機能調整理由・投与間隔" values={[dose.adjustmentReason ?? "薬剤固有ルールを確認", dose.interval]} />
                   <InfoBlock label="8. 経路・点滴時間" values={[drug.route, dose.infusionTime]} />
                   <InfoBlock label="9. TDM" values={[dose.tdm]} />
-                  <InfoBlock label="10. 注意事項" values={[drug.renalAdjustment, `HD / PD / CRRT：${dose.dialysis}`, ...dose.warnings]} />
+                  <InfoBlock label="10. 注意事項" values={[drug.renalAdjustment, `HD / PD / CRRT：${dose.dialysis}`, ...(dose.evidenceDetails ?? []), ...dose.warnings]} />
                   <InfoBlock label="11. 出典" values={[drug.genericName, drug.brandNames.join(" / "), `対象感染症：${result.infection.label}`, dose.source, `情報確認日 ${dose.checkedAt}`]} />
                   {dose.warnings.map((warning) => <p key={warning} className="warning-line">{warning}</p>)}
                 </div>
