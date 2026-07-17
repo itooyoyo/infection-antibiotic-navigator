@@ -7,6 +7,7 @@ import { antibiotics } from "@/data/antibiotics";
 import { drugInteractions } from "@/data/drugInteractions";
 import { infectionProfiles } from "@/data/infections";
 import { infectionDecisionSupport } from "@/data/infectionDecisionSupport";
+import { getMeningitisPhenotype, meningitisPhenotypes, type MeningitisPhenotypeId } from "@/data/meningitisDosing";
 import { poorResponseChecklist, type ReassessmentInput } from "@/data/reassessmentRules";
 import { resistanceRiskLabels } from "@/data/resistanceRules";
 import { buildRecommendation, unsupportedConditions } from "@/lib/clinicalEngine";
@@ -172,6 +173,7 @@ export default function NavigatorApp() {
   const [reassessment, setReassessment] = useState<ReassessmentInput>({ ...defaultReassessment });
   const [severity, setSeverity] = useState("中等症候補");
   const [doseDrugIds, setDoseDrugIds] = useState<string[]>([]);
+  const [meningitisPhenotypeId, setMeningitisPhenotypeId] = useState<MeningitisPhenotypeId>("community-18-49");
 
   const result = useMemo(
     () => buildRecommendation({ infectionId, context, redFlags, sourceControl, renalInput: renal, reassessment }),
@@ -193,6 +195,10 @@ export default function NavigatorApp() {
     () => Array.from(new Map([...result.standardCandidates, ...result.severeCandidates, ...result.alternativeCandidates].map((drug) => [drug.id, drug])).values()),
     [result.standardCandidates, result.severeCandidates, result.alternativeCandidates],
   );
+  const meningitisPhenotype = getMeningitisPhenotype(meningitisPhenotypeId);
+  const visibleDoseCandidates = infectionId === "bacterialMeningitis"
+    ? doseCandidates.filter((drug) => meningitisPhenotype.candidateDrugIds.includes(drug.id))
+    : doseCandidates;
 
   return (
     <main className="app-shell">
@@ -292,6 +298,17 @@ export default function NavigatorApp() {
       <section className="step-block">
         <StepHeading step="Step 4" title="経験的抗菌薬候補" lead="培養採取、追加カバー条件、狭域化条件を同じ画面で確認します。" />
         <GuideCharacter message={guideMessages.step4} />
+        {infectionId === "bacterialMeningitis" && (
+          <div className="rules-panel">
+            <label>髄膜炎病型
+              <select value={meningitisPhenotypeId} onChange={(event) => { setMeningitisPhenotypeId(event.target.value as MeningitisPhenotypeId); setDoseDrugIds([]); }}>
+                {meningitisPhenotypes.map((item) => <option key={item.id} value={item.id}>{item.label}</option>)}
+              </select>
+            </label>
+            <p>{meningitisPhenotype.reason}</p>
+            <p>{meningitisPhenotype.candidateDrugIds.map((id) => `${antibiotics.find((drug) => drug.id === id)?.genericName ?? id}：${meningitisPhenotype.classification[id]}`).join(" / ")}</p>
+          </div>
+        )}
         <p className="culture-note">培養採取により治療開始が危険に遅れる場合を除き、可能な範囲で抗菌薬投与前に採取を検討する。</p>
         <div className="culture-row">{result.infection.firstCultures.map((item) => <span key={item}>{item}</span>)}</div>
         <div className="rules-panel">
@@ -415,13 +432,13 @@ export default function NavigatorApp() {
         {result.renal.warnings.map((warning) => <p key={warning} className="warning-line">{warning}</p>)}
         <p className="culture-note">本表示は用量確認を支援する参考情報です。感染部位、重症度、病原体、MIC、腎機能の推移、透析条件、採用製剤、最新添付文書、院内プロトコルを確認してください。</p>
         <div className="toggle-grid compact dose-selector">
-          {doseCandidates.map((drug) => (
+          {visibleDoseCandidates.map((drug) => (
             <ToggleButton key={drug.id} label={`${drug.genericName}の用量を確認`} active={doseDrugIds.includes(drug.id)} onClick={() => setDoseDrugIds((current) => current.includes(drug.id) ? current.filter((id) => id !== drug.id) : [...current, drug.id])} />
           ))}
         </div>
         {doseDrugIds.length === 0 && <p className="micro-note">候補薬を選択すると詳細な腎機能別用量を展開します。選択は処方確定ではありません。</p>}
         <div className="dose-guidance-list">
-          {doseCandidates.filter((drug) => doseDrugIds.includes(drug.id)).map((drug) => {
+          {visibleDoseCandidates.filter((drug) => doseDrugIds.includes(drug.id)).map((drug) => {
             const dose = getRenalDoseRecommendation({ drugId: drug.id, indication: doseIndication(drug.id, infectionId), renal: result.renal, renalInput: renal });
             const explanation = reasoning.selected.find((item) => item.drugId === drug.id);
             return (
@@ -430,15 +447,15 @@ export default function NavigatorApp() {
                 <div className="dose-guidance-grid">
                   <InfoBlock label="1. なぜ候補か" values={explanation?.why ?? ["感染症・推定病原体・患者背景から候補化"]} />
                   <InfoBlock label="2. 対象起因菌" values={drug.targetOrganisms.length ? drug.targetOrganisms : result.pathogens.map((item) => item.name)} />
-                  <InfoBlock label="3. 通常用量" values={[dose.normalDose]} />
-                  <InfoBlock label="4. 患者の腎機能" values={[`Cockcroft–Gault CCr ${dose.crcl ?? "算出不能"} mL/min`, `日本人eGFR ${result.renal.egfrJapanese ?? "算出不能"} mL/min/1.73m²`, `absolute eGFR ${result.renal.egfrAbsolute ?? "算出不能"} mL/min`, `${result.renal.usedWeightLabel} ${result.renal.usedWeight ?? "-"} kg`, `用量判定指標：${dose.renalMetric ?? "Cockcroft–Gault CCr"}`, dose.category]} />
-                  <InfoBlock label="5. 腎機能調整後の維持量候補" values={[dose.maintenanceDose]} />
-                  <InfoBlock label="6. 初回負荷量" values={[dose.loadingDose]} />
-                  <InfoBlock label="7. 腎機能調整理由・投与間隔" values={[dose.adjustmentReason ?? "薬剤固有ルールを確認", dose.interval]} />
-                  <InfoBlock label="8. 経路・点滴時間" values={[drug.route, dose.infusionTime]} />
-                  <InfoBlock label="9. TDM" values={[dose.tdm]} />
-                  <InfoBlock label="10. 注意事項" values={[drug.renalAdjustment, `HD / PD / CRRT：${dose.dialysis}`, ...(dose.evidenceDetails ?? []), ...dose.warnings]} />
-                  <InfoBlock label="11. 出典" values={[drug.genericName, drug.brandNames.join(" / "), `対象感染症：${result.infection.label}`, dose.source, `情報確認日 ${dose.checkedAt}`]} />
+                  <InfoBlock label="3. 通常用量" values={[infectionId === "bacterialMeningitis" ? "一般感染症用量を髄膜炎へ流用しません" : dose.normalDose]} />
+                  <InfoBlock label="4. 髄膜炎・重症感染症用量" values={[dose.normalDose]} />
+                  <InfoBlock label="5〜9. 患者の腎機能と使用指標" values={[`日本人eGFR ${result.renal.egfrJapanese ?? "算出不能"} mL/min/1.73m²`, `absolute eGFR ${result.renal.egfrAbsolute ?? "算出不能"} mL/min`, `Cockcroft–Gault CCr ${dose.crcl ?? "算出不能"} mL/min`, `${result.renal.usedWeightLabel} ${result.renal.usedWeight ?? "-"} kg`, `この薬剤の用量判定指標：${dose.renalMetric ?? "資料上、特定の推算式または区分が明示されていません"}`, dose.category]} />
+                  <InfoBlock label="10〜13. 用量候補・初回負荷・維持量・間隔" values={[dose.maintenanceDose, dose.loadingDose, dose.adjustmentReason ?? "薬剤固有ルールを確認", dose.interval]} />
+                  <InfoBlock label="14. 経路・点滴時間" values={[drug.route, dose.infusionTime]} />
+                  <InfoBlock label="15. HD / PD / CRRT" values={[dose.dialysis]} />
+                  <InfoBlock label="16. TDM" values={[dose.tdm]} />
+                  <InfoBlock label="17. 重要な副作用・注意事項" values={[...drug.majorAdverseEffects, ...drug.interactions, ...drug.cautions, drug.renalAdjustment, ...(dose.evidenceDetails ?? []), ...dose.warnings]} />
+                  <InfoBlock label="18〜19. 出典・情報確認日" values={[drug.genericName, drug.brandNames.join(" / "), `対象感染症：${result.infection.label}`, dose.source, `情報確認日 ${dose.checkedAt}`]} />
                   {dose.warnings.map((warning) => <p key={warning} className="warning-line">{warning}</p>)}
                 </div>
               </details>

@@ -27,6 +27,7 @@ export function getRenalDoseRecommendation(params: {
   }
   const evidence = evidenceAntibioticDoses.find((item) => item.antibioticId === drugId && item.indication === indication);
   if (evidence && renal.category !== "unstable") {
+    warnings.push(...(evidence.warnings ?? []));
     const band = crcl === null ? undefined : evidence.renalBands.find((item) => (item.min === null || crcl >= item.min) && (item.max === null || crcl <= item.max));
     const needsIndividualDesign = evidence.renalMetric === "TDM";
     const noNumericBand = evidence.renalBands.length === 0 && !needsIndividualDesign;

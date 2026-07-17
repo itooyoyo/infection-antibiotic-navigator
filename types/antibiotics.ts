@@ -134,6 +134,7 @@ export type EvidenceAntibioticDose = {
   version: string;
   verifiedAt: string;
   domesticApproved: boolean;
+  warnings?: string[];
 };
 
 export type PkPdIndex = "%fT>MIC" | "AUC/MIC" | "Cmax/MIC" | "AUC/MIC または Cmax/MIC" | "薬剤ごとに確認";
