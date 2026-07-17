@@ -333,3 +333,88 @@ test("新規感染症も培養・画像・Source Control・再評価・狭域化
     assert.ok(item.reference.length, `${item.label}: reference`);
   }
 });
+
+test("40歳男性の日本人eGFR・absolute eGFR・Cockcroft-Gault CCrが手計算値と一致", () => {
+  const result = calculateRenalFunction({ ...baseRenal, age: 40, sex: "male", heightCm: 170, actualWeightKg: 70, serumCr: 1, weightStrategy: "auto" });
+  assert.equal(result.egfrJapanese, 67.3);
+  assert.equal(result.bsa, 1.8);
+  assert.equal(result.egfrAbsolute, 70.4);
+  assert.equal(result.crclCockcroftGault, 97.2);
+});
+
+test("80歳女性ではeGFR 0.739係数とCCr 0.85係数を反映", () => {
+  const result = calculateRenalFunction({ ...baseRenal, age: 80, sex: "female", heightCm: 150, actualWeightKg: 45, serumCr: 1, weightStrategy: "auto" });
+  assert.equal(result.egfrJapanese, 40.8);
+  assert.equal(result.egfrAbsolute, 32.3);
+  assert.equal(result.crclCockcroftGault, 31.9);
+  assert.ok(result.formulas.some((item) => item.includes("0.739")));
+  assert.ok(result.formulas.some((item) => item.includes("0.85")));
+});
+
+test("肥満患者は実体重・理想体重・補正体重を保持し補正体重を自動選択", () => {
+  const result = calculateRenalFunction({ ...baseRenal, age: 50, heightCm: 170, actualWeightKg: 120, serumCr: 1, weightStrategy: "auto" });
+  assert.ok(result.idealBodyWeight);
+  assert.ok(result.adjustedBodyWeight);
+  assert.equal(result.usedWeightLabel, "補正体重");
+});
+
+test("低体重患者は実体重を使用", () => {
+  const result = calculateRenalFunction({ ...baseRenal, age: 60, heightCm: 170, actualWeightKg: 45, serumCr: 1, lowBodyWeight: true, weightStrategy: "auto" });
+  assert.equal(result.usedWeightLabel, "実体重");
+  assert.equal(result.usedWeight, 45);
+});
+
+test("サルコペニアはCrベース推算の過大評価警告", () => {
+  const result = calculateRenalFunction({ ...baseRenal, lowMuscleMass: true, weightStrategy: "auto" });
+  assert.ok(result.warnings.some((item) => item.includes("腎機能を過大評価")));
+});
+
+test("AKI・乏尿は非定常状態警告", () => {
+  const result = calculateRenalFunction({ ...baseRenal, stableRenalFunction: false, aki: true, oliguria: true, weightStrategy: "auto" });
+  assert.ok(result.warnings.some((item) => item.includes("定常状態ではない")));
+  assert.equal(result.category, "unstable");
+});
+
+test("範囲外入力では腎機能を計算しない", () => {
+  const result = calculateRenalFunction({ ...baseRenal, age: 10, heightCm: 90, actualWeightKg: 10, serumCr: 0.01, weightStrategy: "auto" });
+  assert.equal(result.valid, false);
+  assert.equal(result.egfrJapanese, null);
+  assert.equal(result.crclCockcroftGault, null);
+  assert.equal(result.validationErrors.length, 4);
+});
+
+test("髄膜炎は一般感染症用量を流用せず専用適応で未確認値を保留", () => {
+  const renal = calculateRenalFunction({ ...baseRenal, weightStrategy: "auto" });
+  const dose = getRenalDoseRecommendation({ drugId: "ceftriaxone", indication: "細菌性髄膜炎", renal, renalInput: { ...baseRenal, weightStrategy: "auto" } });
+  assert.match(dose.maintenanceDose, /具体的用量は/);
+  assert.equal(dose.source, "確認条件不足");
+});
+
+test("蜂窩織炎の用量表示対象は病型に登録された候補薬だけ", () => {
+  const profile = infectionProfiles.find((item) => item.id === "cellulitis");
+  const ids = new Set([...profile.standardCandidateIds, ...profile.severeCandidateIds, ...profile.alternativeCandidateIds]);
+  assert.deepEqual([...ids], ["cefazolin", "ampicillinSulbactam", "vancomycin", "clindamycin"]);
+  assert.ok(!ids.has("meropenem"));
+});
+
+test("腎盂腎炎候補は薬剤別腎用量ロジックへ連携し未確認値を安全に保留", () => {
+  const profile = infectionProfiles.find((item) => item.id === "pyelonephritis");
+  const renalInput = { ...baseRenal, weightStrategy: "auto" };
+  const renal = calculateRenalFunction(renalInput);
+  for (const drugId of new Set([...profile.standardCandidateIds, ...profile.severeCandidateIds, ...profile.alternativeCandidateIds])) {
+    const dose = getRenalDoseRecommendation({ drugId, indication: profile.label, renal, renalInput });
+    assert.ok(dose.maintenanceDose);
+    assert.ok(dose.source);
+  }
+});
+
+test("CCr計算体重は実体重・理想体重・補正体重へ手動切替できる", () => {
+  const input = { ...baseRenal, age: 50, heightCm: 170, actualWeightKg: 120, serumCr: 1 };
+  const actual = calculateRenalFunction({ ...input, weightStrategy: "actual" });
+  const ideal = calculateRenalFunction({ ...input, weightStrategy: "ideal" });
+  const adjusted = calculateRenalFunction({ ...input, weightStrategy: "adjusted" });
+  assert.equal(actual.usedWeightLabel, "実体重");
+  assert.equal(ideal.usedWeightLabel, "理想体重");
+  assert.equal(adjusted.usedWeightLabel, "補正体重");
+  assert.notEqual(actual.crclCockcroftGault, adjusted.crclCockcroftGault);
+});

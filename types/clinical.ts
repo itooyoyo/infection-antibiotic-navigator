@@ -85,11 +85,25 @@ export type RenalInput = {
   severeObesity: boolean;
   lowBodyWeight: boolean;
   edema: boolean;
+  oliguria: boolean;
+  amputation: boolean;
+  lowMuscleMass: boolean;
+  spinalCordInjury: boolean;
+  bedridden: boolean;
+  severeMalnutrition: boolean;
+  hemodynamicInstability: boolean;
+  largeVolumeInfusion: boolean;
+  sepsis: boolean;
+  recentCrrtChange: boolean;
+  arcSuspected: boolean;
+  weightStrategy: "auto" | "actual" | "ideal" | "adjusted";
 };
 
 export type RenalResult = {
   bmi: number | null;
   egfrJapanese: number | null;
+  bsa: number | null;
+  egfrAbsolute: number | null;
   crclCockcroftGault: number | null;
   idealBodyWeight: number | null;
   adjustedBodyWeight: number | null;
@@ -98,6 +112,10 @@ export type RenalResult = {
   category: RenalCategory;
   warnings: string[];
   rationale: string;
+  weightSelectionReason: string;
+  formulas: string[];
+  validationErrors: string[];
+  valid: boolean;
 };
 
 export type Antibiotic = {

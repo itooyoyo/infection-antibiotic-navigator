@@ -105,6 +105,18 @@ const defaultRenal: RenalInput = {
   severeObesity: false,
   lowBodyWeight: false,
   edema: false,
+  oliguria: false,
+  amputation: false,
+  lowMuscleMass: false,
+  spinalCordInjury: false,
+  bedridden: false,
+  severeMalnutrition: false,
+  hemodynamicInstability: false,
+  largeVolumeInfusion: false,
+  sepsis: false,
+  recentCrrtChange: false,
+  arcSuspected: false,
+  weightStrategy: "auto",
 };
 
 const guideMessages: Record<string, string> = {
@@ -159,6 +171,7 @@ export default function NavigatorApp() {
   const [sourceControl, setSourceControl] = useState<Record<string, boolean>>({});
   const [reassessment, setReassessment] = useState<ReassessmentInput>({ ...defaultReassessment });
   const [severity, setSeverity] = useState("中等症候補");
+  const [doseDrugIds, setDoseDrugIds] = useState<string[]>([]);
 
   const result = useMemo(
     () => buildRecommendation({ infectionId, context, redFlags, sourceControl, renalInput: renal, reassessment }),
@@ -175,6 +188,10 @@ export default function NavigatorApp() {
         renal: result.renal,
       }),
     [infectionId, context, severity, sourceControl, result.standardCandidates, result.severeCandidates, result.alternativeCandidates, result.renal],
+  );
+  const doseCandidates = useMemo(
+    () => Array.from(new Map([...result.standardCandidates, ...result.severeCandidates, ...result.alternativeCandidates].map((drug) => [drug.id, drug])).values()),
+    [result.standardCandidates, result.severeCandidates, result.alternativeCandidates],
   );
 
   return (
@@ -352,40 +369,83 @@ export default function NavigatorApp() {
             ["severeObesity", "重度肥満"],
             ["lowBodyWeight", "低体重"],
             ["edema", "浮腫"],
+            ["oliguria", "乏尿"],
+            ["amputation", "四肢切断"],
+            ["lowMuscleMass", "筋肉量低下・サルコペニア"],
+            ["spinalCordInjury", "脊髄損傷"],
+            ["bedridden", "寝たきり"],
+            ["severeMalnutrition", "重度低栄養"],
+            ["hemodynamicInstability", "循環動態不安定"],
+            ["largeVolumeInfusion", "大量輸液"],
+            ["sepsis", "敗血症"],
+            ["recentCrrtChange", "CRRT開始・条件変更直後"],
+            ["arcSuspected", "ARC疑い"],
           ] as Array<[keyof RenalInput, string]>).map(([key, label]) => (
             <ToggleButton key={key} label={label} active={Boolean(renal[key])} onClick={() => setRenal({ ...renal, [key]: !renal[key] })} />
           ))}
         </div>
+        <label className="weight-selector">
+          CCr計算に使用する体重
+          <select value={renal.weightStrategy} onChange={(event) => setRenal({ ...renal, weightStrategy: event.target.value as RenalInput["weightStrategy"] })}>
+            <option value="auto">自動選択</option>
+            <option value="actual">実体重</option>
+            <option value="ideal">理想体重</option>
+            <option value="adjusted">補正体重</option>
+          </select>
+        </label>
         <div className="renal-results">
           <Metric label="BMI" value={result.renal.bmi ?? "未計算"} />
-          <Metric label="日本人eGFR" value={result.renal.egfrJapanese ?? "未計算"} />
-          <Metric label="Cockcroft-Gault CrCl" value={result.renal.crclCockcroftGault ?? "未計算"} />
+          <Metric label="BSA" value={result.renal.bsa === null ? "未計算" : `${result.renal.bsa} m²`} />
+          <Metric label="日本人eGFR（体表面積補正値）" value={result.renal.egfrJapanese === null ? "未計算" : `${result.renal.egfrJapanese} mL/min/1.73m²`} />
+          <Metric label="体表面積補正を外したeGFR" value={result.renal.egfrAbsolute === null ? "未計算" : `${result.renal.egfrAbsolute} mL/min`} />
+          <Metric label="Cockcroft–Gault推算CCr" value={result.renal.crclCockcroftGault === null ? "未計算" : `${result.renal.crclCockcroftGault} mL/min`} />
+          <Metric label="実体重" value={`${renal.actualWeightKg} kg`} />
+          <Metric label="理想体重" value={result.renal.idealBodyWeight === null ? "未計算" : `${result.renal.idealBodyWeight} kg`} />
+          <Metric label="補正体重" value={result.renal.adjustedBodyWeight === null ? "未計算" : `${result.renal.adjustedBodyWeight} kg`} />
           <Metric label="使用体重" value={`${result.renal.usedWeightLabel} ${result.renal.usedWeight ?? "-"} kg`} />
           <Metric label="腎機能区分" value={result.renal.category} />
         </div>
-        <p className="micro-note">{result.renal.rationale}</p>
+        <p className="micro-note">体重選択理由：{result.renal.weightSelectionReason}</p>
+        <details className="reasoning-accordion calculation-basis">
+          <summary>計算根拠</summary>
+          <ul>{result.renal.formulas.map((formula) => <li key={formula}>{formula}</li>)}</ul>
+          <p>途中で整数丸めを行わず、最終表示時のみ小数第1位へ丸めています。</p>
+          <p>計算式：日本腎臓学会の成人日本人eGFR式、Du Bois BSA式、Cockcroft–Gault式。</p>
+        </details>
         {result.renal.warnings.map((warning) => <p key={warning} className="warning-line">{warning}</p>)}
         <p className="culture-note">本表示は用量確認を支援する参考情報です。感染部位、重症度、病原体、MIC、腎機能の推移、透析条件、採用製剤、最新添付文書、院内プロトコルを確認してください。</p>
+        <div className="toggle-grid compact dose-selector">
+          {doseCandidates.map((drug) => (
+            <ToggleButton key={drug.id} label={`${drug.genericName}の用量を確認`} active={doseDrugIds.includes(drug.id)} onClick={() => setDoseDrugIds((current) => current.includes(drug.id) ? current.filter((id) => id !== drug.id) : [...current, drug.id])} />
+          ))}
+        </div>
+        {doseDrugIds.length === 0 && <p className="micro-note">候補薬を選択すると詳細な腎機能別用量を展開します。選択は処方確定ではありません。</p>}
         <div className="dose-guidance-list">
-          {result.selectedCandidates.map((drug) => {
+          {doseCandidates.filter((drug) => doseDrugIds.includes(drug.id)).map((drug) => {
             const dose = getRenalDoseRecommendation({ drugId: drug.id, indication: doseIndication(drug.id, infectionId), renal: result.renal, renalInput: renal });
+            const explanation = reasoning.selected.find((item) => item.drugId === drug.id);
             return (
               <details key={drug.id} className="reasoning-accordion">
                 <summary>{drug.genericName}：腎機能別用量確認</summary>
                 <div className="dose-guidance-grid">
-                  <InfoBlock label="腎機能評価" values={[dose.category, `CrCl ${dose.crcl ?? "算出不能"} mL/min`, `eGFR ${result.renal.egfrJapanese ?? "算出不能"}`, `${result.renal.usedWeightLabel} ${result.renal.usedWeight ?? "-"} kg`, renal.stableRenalFunction ? "腎機能は安定入力" : "腎機能は非定常入力"]} />
-                  <InfoBlock label="維持量・間隔" values={[dose.maintenanceDose, dose.interval, dose.infusionTime]} />
-                  <InfoBlock label="初回負荷量" values={[dose.loadingDose]} />
-                  <InfoBlock label="HD / PD / CRRT" values={[dose.dialysis]} />
-                  <InfoBlock label="TDM" values={[dose.tdm]} />
-                  <InfoBlock label="出典" values={[dose.source, `確認日 ${dose.checkedAt}`]} />
+                  <InfoBlock label="1. なぜ候補か" values={explanation?.why ?? ["感染症・推定病原体・患者背景から候補化"]} />
+                  <InfoBlock label="2. 対象起因菌" values={drug.targetOrganisms.length ? drug.targetOrganisms : result.pathogens.map((item) => item.name)} />
+                  <InfoBlock label="3. 通常用量" values={[dose.normalDose]} />
+                  <InfoBlock label="4. 患者の腎機能" values={[`Cockcroft–Gault CCr ${dose.crcl ?? "算出不能"} mL/min`, `日本人eGFR ${result.renal.egfrJapanese ?? "算出不能"} mL/min/1.73m²`, `absolute eGFR ${result.renal.egfrAbsolute ?? "算出不能"} mL/min`, `${result.renal.usedWeightLabel} ${result.renal.usedWeight ?? "-"} kg`, `用量判定指標：Cockcroft–Gault CCr（当該ルールの出典基準）`, dose.category]} />
+                  <InfoBlock label="5. 腎機能調整後の維持量候補" values={[dose.maintenanceDose]} />
+                  <InfoBlock label="6. 初回負荷量" values={[dose.loadingDose]} />
+                  <InfoBlock label="7. 投与間隔" values={[dose.interval]} />
+                  <InfoBlock label="8. 経路・点滴時間" values={[drug.route, dose.infusionTime]} />
+                  <InfoBlock label="9. TDM" values={[dose.tdm]} />
+                  <InfoBlock label="10. 注意事項" values={[drug.renalAdjustment, `HD / PD / CRRT：${dose.dialysis}`, ...dose.warnings]} />
+                  <InfoBlock label="11. 出典" values={[drug.genericName, drug.brandNames.join(" / "), `対象感染症：${result.infection.label}`, dose.source, `情報確認日 ${dose.checkedAt}`]} />
                   {dose.warnings.map((warning) => <p key={warning} className="warning-line">{warning}</p>)}
                 </div>
               </details>
             );
           })}
         </div>
-        <p className="culture-note">施設採用薬、院内プロトコル、最新添付文書を確認してください。</p>
+        <p className="culture-note">本表示は抗菌薬用量確認を支援する参考情報です。感染部位、重症度、MIC、腎機能の推移、尿量、透析条件、採用製剤、最新添付文書、院内プロトコルを確認してください。</p>
       </section>
 
       <section className="step-block">
