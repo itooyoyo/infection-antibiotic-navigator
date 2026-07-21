@@ -19,6 +19,7 @@ import { assessDeescalation, deescalationWarnings, emptyCultureResults } from ".
 import { careBundleFor, commonCareBundle, diseaseCareBundles, preCompletionChecklist, specialistConsultConditions, specialistConsultReasons } from "../data/careBundles.ts";
 import { commonStewardshipChecks, drugStewardshipChecks, stewardshipChecksForDrugIds } from "../data/stewardshipChecks.ts";
 import { emptyMedicationSafetyInput, evaluateMedicationSafety, medicationSafetyInputLabels } from "../data/medicationSafety.ts";
+import { evidenceForDrug, evidenceForRegimen, evidenceLastReviewed, evidenceLevels, evidenceReferenceCatalog } from "../data/evidenceEngine.ts";
 
 const baseContext = {
   healthcareAssociated: false,
@@ -523,6 +524,73 @@ test("重症肝障害は用量調整再確認を表示する", () => assert.equa
 test("安全性メッセージは処方禁止と断定しない", () => {
   const alerts = evaluateMedicationSafety(["vancomycin", "meropenem", "cefepime", "piperacillinTazobactam", "ampicillin", "levofloxacin", "clindamycin", "metronidazole"], safetyInput({ betaLactamAllergy: true, penicillinAnaphylaxis: true, pregnancy: true, breastfeeding: true, g6pdDeficiency: true, qtProlongation: true, epilepsy: true, severeLiverDisease: true, hemodialysis: true, valproate: true, warfarin: true, doac: true, tacrolimus: true, alcoholUse: true, cDiffRisk: true, aki: true }));
   for (const entry of alerts) assert.doesNotMatch(`${entry.message} ${entry.alternative ?? ""}`, /処方禁止|投与禁止/);
+});
+
+for (const [infectionId, regimens] of Object.entries(auditedInfectionRegimens)) {
+  test(`${infectionId}の全推奨レジメンにEvidenceを表示する`, () => {
+    assert.ok(regimens.length > 0);
+    for (const regimen of regimens) {
+      const evidence = evidenceForRegimen(regimen);
+      assert.equal(evidence.id, `evidence-${regimen.id}`);
+      assert.ok(evidence.summary.length > 0);
+      assert.equal(evidence.whyThisRegimen, regimen.explainWhy);
+      assert.ok(evidence.expectedPathogens.length > 0);
+      assert.ok(evidence.requiredCoverage.length > 0);
+      assert.ok(evidence.sourceControl.length > 0);
+      assert.ok(evidence.deEscalation.length > 0);
+      assert.ok(evidence.treatmentDuration.length > 0);
+      assert.ok(evidenceLevels.includes(evidence.evidenceLevel));
+      assert.ok(evidence.references.length >= 2);
+      assert.equal(evidence.lastReviewed, "2026-07");
+    }
+  });
+}
+
+test("憩室炎Evidenceは腸内細菌科と嫌気性菌を説明する", () => {
+  const evidence = evidenceForRegimen(auditedInfectionRegimens.diverticulitis[0]);
+  assert.match(evidence.summary, /腸内細菌科/);
+  assert.match(evidence.summary, /嫌気性菌/);
+});
+
+test("市中肺炎Evidenceは肺炎球菌を説明する", () => assert.match(evidenceForRegimen(auditedInfectionRegimens.cap[0]).summary, /肺炎球菌/));
+test("胆管炎Evidenceは胆道ドレナージを説明する", () => assert.match(evidenceForRegimen(auditedInfectionRegimens.cholangitis[0]).summary, /胆道ドレナージ/));
+test("髄膜炎Evidenceは抗菌薬開始を遅らせない考え方を説明する", () => assert.match(evidenceForRegimen(auditedInfectionRegimens.bacterialMeningitis[0]).summary, /遅らせ/));
+
+test("Evidence Levelは4区分を保持し実データで全区分を使用する", () => {
+  assert.deepEqual(evidenceLevels, ["High", "Moderate", "Low", "Expert Opinion"]);
+  const used = new Set(Object.values(auditedInfectionRegimens).flat().map((regimen) => evidenceForRegimen(regimen).evidenceLevel));
+  for (const level of evidenceLevels) assert.ok(used.has(level), level);
+});
+
+test("Evidence Referenceは複数登録と領域別資料に対応する", () => {
+  assert.ok(evidenceReferenceCatalog.length >= 10);
+  assert.ok(evidenceForRegimen(auditedInfectionRegimens.cap[0]).references.some((reference) => reference.includes("ATS/IDSA")));
+  assert.ok(evidenceForRegimen(auditedInfectionRegimens.cholangitis[0]).references.some((reference) => reference.includes("Tokyo Guidelines")));
+  assert.ok(evidenceForRegimen(auditedInfectionRegimens.pyelonephritis[0]).references.some((reference) => reference.includes("2025")));
+});
+
+test("VCMを含むEvidenceはTDMガイドラインを参照する", () => {
+  const evidence = evidenceForRegimen(auditedInfectionRegimens.bacterialMeningitis[0]);
+  assert.ok(evidence.references.some((reference) => reference.includes("TDM")));
+});
+
+test("EvidenceごとにLast Reviewedを保存する", () => {
+  assert.equal(evidenceLastReviewed, "2026-07");
+  for (const regimen of Object.values(auditedInfectionRegimens).flat()) assert.match(evidenceForRegimen(regimen).lastReviewed, /^\d{4}-\d{2}$/);
+});
+
+test("個別薬剤候補にもEvidence Cardを生成する", () => {
+  const evidence = evidenceForDrug("brainAbscess", "ceftriaxone", "セフトリアキソン", "想定菌と組織移行を踏まえて検討します。");
+  assert.equal(evidence.infectionId, "brainAbscess");
+  assert.ok(evidence.references.length >= 2);
+  assert.ok(evidence.expectedPathogens.length > 0);
+});
+
+test("Evidenceは断定ではなく参考情報として表現する", () => {
+  for (const evidence of Object.values(auditedInfectionRegimens).flat().map(evidenceForRegimen)) {
+    assert.doesNotMatch(evidence.summary, /必ずこの薬|絶対に|処方を確定/);
+    assert.match(evidence.summary, /考え方|重要|重視|考慮|調整|評価|選択|治療/);
+  }
 });
 
 test("監査対象では軽症にMEPMを第一選択表示しない", () => {

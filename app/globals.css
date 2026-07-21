@@ -766,6 +766,60 @@ dd {
   color: #ffdce5;
 }
 
+.evidence-accordion {
+  margin-top: 12px;
+  border: 1px solid rgba(85, 201, 255, 0.3);
+  border-radius: 12px;
+  background: rgba(8, 31, 51, 0.58);
+  overflow: hidden;
+}
+
+.evidence-accordion > summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 11px 12px;
+  color: var(--cyan);
+  cursor: pointer;
+  font-weight: 900;
+}
+
+.evidence-accordion > summary span {
+  border: 1px solid rgba(85, 201, 255, 0.42);
+  border-radius: 999px;
+  padding: 3px 8px;
+  color: #e3f8ff;
+  font-size: 0.72rem;
+  white-space: nowrap;
+}
+
+.evidence-card {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 10px;
+  padding: 0 12px 12px;
+  min-width: 0;
+}
+
+.evidence-card .info-block {
+  min-width: 0;
+  border: 1px solid rgba(126, 210, 255, 0.16);
+  border-radius: 10px;
+  padding: 10px;
+  background: rgba(2, 15, 28, 0.48);
+}
+
+.evidence-disclaimer {
+  grid-column: 1 / -1;
+  margin: 0;
+  border-left: 4px solid #55c9ff;
+  padding: 9px 11px;
+  background: rgba(55, 178, 255, 0.1);
+  color: #dff6ff;
+  line-height: 1.55;
+}
+
 .reasoning-conclusion {
   color: #e7fff5;
   font-weight: 700;

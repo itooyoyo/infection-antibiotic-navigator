@@ -20,6 +20,7 @@ import { assessDeescalation, cultureOrganisms, cultureSites, emptyCultureResults
 import { careBundleFor, preCompletionChecklist, specialistConsultReasons } from "@/data/careBundles";
 import { commonStewardshipChecks, stewardshipChecksForDrugIds } from "@/data/stewardshipChecks";
 import { emptyMedicationSafetyInput, evaluateMedicationSafety, medicationSafetyInputLabels, type MedicationSafetyInput } from "@/data/medicationSafety";
+import { evidenceForDrug, evidenceForRegimen, type RegimenEvidence } from "@/data/evidenceEngine";
 
 const redFlagItems = [
   "収縮期血圧低下",
@@ -404,9 +405,9 @@ export default function NavigatorApp() {
             </>
           ) : (
             <>
-              <CandidateColumn title="標準候補" drugs={result.standardCandidates} reasoning={reasoning.selected} />
-              <CandidateColumn title="重症例候補" drugs={result.severeCandidates} reasoning={reasoning.selected} />
-              <CandidateColumn title="代替候補" drugs={result.alternativeCandidates} reasoning={reasoning.selected} />
+              <CandidateColumn title="標準候補" drugs={result.standardCandidates} reasoning={reasoning.selected} infectionId={infectionId} />
+              <CandidateColumn title="重症例候補" drugs={result.severeCandidates} reasoning={reasoning.selected} infectionId={infectionId} />
+              <CandidateColumn title="代替候補" drugs={result.alternativeCandidates} reasoning={reasoning.selected} infectionId={infectionId} />
             </>
           )}
         </div>
@@ -889,7 +890,7 @@ function TagRow({ drug }: { drug: ReturnType<typeof buildRecommendation>["select
   );
 }
 
-function CandidateColumn({ title, drugs, reasoning }: { title: string; drugs: ReturnType<typeof buildRecommendation>["standardCandidates"]; reasoning: AntibioticReasoning[] }) {
+function CandidateColumn({ title, drugs, reasoning, infectionId }: { title: string; drugs: ReturnType<typeof buildRecommendation>["standardCandidates"]; reasoning: AntibioticReasoning[]; infectionId: InfectionId }) {
   return (
     <div className="candidate-column">
       <h3>{title}</h3>
@@ -920,6 +921,7 @@ function CandidateColumn({ title, drugs, reasoning }: { title: string; drugs: Re
               </details>
             ) : null;
           })()}
+          <EvidenceAccordion evidence={evidenceForDrug(infectionId, drug.id, drug.genericName, reasoning.find((item) => item.drugId === drug.id)?.conclusion ?? "起因菌、必要なCoverage、患者背景を踏まえて検討する候補です。")} />
           <details>
             <summary>用量表示</summary>
             <dl>
@@ -952,10 +954,32 @@ function RegimenColumn({ title, regimens }: { title: string; regimens: ReturnTyp
           <p>Explain Why：{regimen.explainWhy}</p>
           <p>構成薬：{regimen.drugIds.map((id) => antibiotics.find((drug) => drug.id === id)?.genericName ?? id).join(" ＋ ")}</p>
           <p>再評価時期：48-72時間後</p>
+          <EvidenceAccordion evidence={evidenceForRegimen(regimen)} />
         </article>
       ))}
       {regimens.length === 0 && <p className="micro-note">この条件で自動提示する候補はありません。培養・感受性と院内プロトコルを確認してください。</p>}
     </div>
+  );
+}
+
+function EvidenceAccordion({ evidence }: { evidence: RegimenEvidence }) {
+  return (
+    <details className="evidence-accordion">
+      <summary>Evidence <span>{evidence.evidenceLevel}</span></summary>
+      <div className="evidence-card">
+        <p className="evidence-disclaimer">参考情報・一般的な考え方として確認してください。個別患者への適用は臨床状況と施設プロトコルで再評価してください。</p>
+        <InfoBlock label="Evidence Summary" values={[evidence.summary]} />
+        <InfoBlock label="Why this regimen?" values={[evidence.whyThisRegimen]} />
+        <InfoBlock label="Expected pathogens" values={evidence.expectedPathogens} />
+        <InfoBlock label="Required coverage" values={evidence.requiredCoverage} />
+        <InfoBlock label="Source control" values={evidence.sourceControl} />
+        <InfoBlock label="De-escalation" values={evidence.deEscalation} />
+        <InfoBlock label="Treatment duration" values={[evidence.treatmentDuration]} />
+        <InfoBlock label="Evidence Level" values={[evidence.evidenceLevel]} />
+        <InfoBlock label="Reference" values={evidence.references} />
+        <InfoBlock label="Last reviewed" values={[evidence.lastReviewed]} />
+      </div>
+    </details>
   );
 }
 
