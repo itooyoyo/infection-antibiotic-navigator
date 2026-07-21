@@ -16,6 +16,7 @@ import { getMeningitisPhenotype } from "../data/meningitisDosing.ts";
 import { sourceControlRules } from "../data/sourceControl.ts";
 import { regimenGuidance } from "../data/regimenGuidance.ts";
 import { assessDeescalation, deescalationWarnings, emptyCultureResults } from "../data/deescalation.ts";
+import { careBundleFor, commonCareBundle, diseaseCareBundles, preCompletionChecklist, specialistConsultConditions, specialistConsultReasons } from "../data/careBundles.ts";
 
 const baseContext = {
   healthcareAssociated: false,
@@ -386,6 +387,60 @@ test("De-escalation提案は指定された4警告を常に表示する", () => 
   const result = deescalationFor({ currentDrugs: ["vancomycin"], entries: [["blood", "MSSA"]] });
   assert.equal(deescalationWarnings.length, 4);
   for (const warning of deescalationWarnings) assert.ok(result.cautions.includes(warning));
+});
+
+test("全感染症で8件の共通Clinical Care Bundleを表示する", () => {
+  assert.equal(commonCareBundle.length, 8);
+  for (const profile of infectionProfiles) {
+    const bundle = careBundleFor(profile.id);
+    for (const common of commonCareBundle) assert.ok(bundle.some((item) => item.id === common.id), `${profile.id}: ${common.id}`);
+  }
+});
+
+for (const [label, infectionId, expectedPattern] of [
+  ["市中肺炎", "cap", /CURB-65/], ["誤嚥性肺炎", "aspirationPneumonia", /嚥下評価/], ["胆管炎", "cholangitis", /胆道ドレナージ/],
+  ["胆嚢炎", "cholecystitis", /胆嚢摘出/], ["憩室炎", "diverticulitis", /穿孔/], ["腹腔内膿瘍", "intraAbdominal", /経皮ドレナージ/],
+  ["肝膿瘍", "liverAbscess", /眼内炎/], ["腎盂腎炎", "pyelonephritis", /尿路閉塞/], ["蜂窩織炎", "cellulitis", /壊死性筋膜炎/],
+  ["壊死性筋膜炎", "necrotizingFasciitis", /緊急手術/], ["細菌性髄膜炎", "bacterialMeningitis", /デキサメタゾン/],
+  ["菌血症", "bacteremiaUnknown", /フォロー血液培養/], ["感染性心内膜炎", "infectiveEndocarditis", /心エコー/],
+]) {
+  test(`${label}で適切な疾患別Bundleを表示する`, () => {
+    const labels = (diseaseCareBundles[infectionId] ?? []).map((item) => item.label).join("、");
+    assert.match(labels, expectedPattern);
+    assert.ok(careBundleFor(infectionId).length > commonCareBundle.length);
+  });
+}
+
+test("Clinical Care BundleにSource Control項目を表示する", () => {
+  const sourceControlItems = [...commonCareBundle, ...Object.values(diseaseCareBundles).flat()].filter((item) => item.category === "source-control");
+  assert.ok(sourceControlItems.length >= 15);
+  assert.ok(sourceControlItems.some((item) => item.label.includes("ドレナージ")));
+  assert.ok(sourceControlItems.some((item) => item.label.includes("デバイス感染")));
+});
+
+for (const [condition, input] of [
+  ["敗血症", { infectionId: "sepsis", sepsis: false }], ["ショック", { infectionId: "cap", shock: true }],
+  ["耐性菌", { infectionId: "cap", resistantOrganism: true }], ["Candida", { infectionId: "cap", candida: true }],
+  ["菌血症", { infectionId: "bacteremiaUnknown" }], ["感染性心内膜炎", { infectionId: "infectiveEndocarditis" }],
+  ["髄膜炎", { infectionId: "bacterialMeningitis" }], ["壊死性筋膜炎", { infectionId: "necrotizingFasciitis" }],
+  ["原因不明発熱", { infectionId: "cap", unexplainedFever: true }],
+]) {
+  test(`${condition}で感染症専門医相談条件を表示する`, () => {
+    const reasons = specialistConsultReasons({ sepsis: false, shock: false, resistantOrganism: false, candida: false, unexplainedFever: false, ...input });
+    assert.ok(reasons.includes(condition));
+    assert.ok(specialistConsultConditions.includes(condition));
+  });
+}
+
+test("治療終了前チェックを6件表示する", () => {
+  assert.equal(preCompletionChecklist.length, 6);
+  const labels = preCompletionChecklist.map((item) => item.label).join("、");
+  for (const term of ["解熱", "バイタル", "CRP", "経口摂取", "IV→PO", "治療期間"]) assert.ok(labels.includes(term), term);
+});
+
+test("Care Bundleは処置を断定せず検討・評価・確認表現を使用する", () => {
+  const all = [...commonCareBundle, ...Object.values(diseaseCareBundles).flat(), ...preCompletionChecklist];
+  for (const bundleItem of all) assert.match(bundleItem.label, /検討|考慮|評価|確認|遅らせない/);
 });
 
 test("監査対象では軽症にMEPMを第一選択表示しない", () => {

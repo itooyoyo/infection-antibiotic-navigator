@@ -17,6 +17,7 @@ import { getRenalDoseRecommendation } from "@/lib/getRenalDoseRecommendation";
 import type { AntibioticReasoning } from "@/types/antibiotics";
 import type { InfectionId, PatientContext, RenalInput } from "@/types/clinical";
 import { assessDeescalation, cultureOrganisms, cultureSites, emptyCultureResults, susceptibilityDrugs, type CultureResults, type CultureStatus, type Susceptibility } from "@/data/deescalation";
+import { careBundleFor, preCompletionChecklist, specialistConsultReasons } from "@/data/careBundles";
 
 const redFlagItems = [
   "収縮期血圧低下",
@@ -178,6 +179,8 @@ export default function NavigatorApp() {
   const [cultureResults, setCultureResults] = useState<CultureResults>(() => emptyCultureResults());
   const [currentTherapyIds, setCurrentTherapyIds] = useState<string[]>([]);
   const [mrsaScreenNegative, setMrsaScreenNegative] = useState(false);
+  const [careBundleChecks, setCareBundleChecks] = useState<Record<string, boolean>>({});
+  const [unexplainedFever, setUnexplainedFever] = useState(false);
 
   const result = useMemo(
     () => buildRecommendation({ infectionId, context, redFlags, sourceControl, renalInput: renal, reassessment }),
@@ -207,6 +210,15 @@ export default function NavigatorApp() {
     () => assessDeescalation({ currentDrugs: currentTherapyIds, cultures: cultureResults, mrsaScreenNegative }),
     [currentTherapyIds, cultureResults, mrsaScreenNegative],
   );
+  const careBundle = careBundleFor(infectionId);
+  const specialistReasons = specialistConsultReasons({
+    infectionId,
+    sepsis: renal.sepsis,
+    shock: Object.entries(redFlags).some(([key, active]) => active && /ショック|血圧|乳酸|末梢循環/.test(key)),
+    resistantOrganism: context.mrsaHistory || context.esblHistory || context.ampCHistory || context.creHistory || context.pseudomonasHistory,
+    candida: Object.values(cultureResults).some((culture) => culture.status === "positive" && culture.organism === "Candida spp."),
+    unexplainedFever,
+  });
 
   return (
     <main className="app-shell">
@@ -564,7 +576,45 @@ export default function NavigatorApp() {
       </section>
 
       <section className="step-block">
-        <StepHeading step="Step 7" title="感染源コントロール" lead="抗菌薬の広域化だけでは改善しない条件を確認します。" />
+        <StepHeading step="Step 7" title="Clinical Care Bundle" lead="抗菌薬選択後に必要な評価・培養・感染源コントロールをチェックします。" />
+        <details className="reasoning-accordion" open>
+          <summary>共通・疾患別チェックリスト</summary>
+          <div className="toggle-grid compact">
+            {careBundle.map((bundleItem) => (
+              <label key={bundleItem.id} className="toggle">
+                <input type="checkbox" checked={Boolean(careBundleChecks[bundleItem.id])} onChange={() => setCareBundleChecks((current) => ({ ...current, [bundleItem.id]: !current[bundleItem.id] }))} />
+                {bundleItem.label}
+              </label>
+            ))}
+          </div>
+        </details>
+        <details className="reasoning-accordion">
+          <summary>専門医相談条件</summary>
+          <div>
+            <ToggleButton label="原因不明発熱" active={unexplainedFever} onClick={() => setUnexplainedFever((value) => !value)} />
+            {specialistReasons.length > 0 ? (
+              <div className="warning-line">
+                <strong>感染症専門医への相談を検討してください。</strong>
+                <p>該当条件：{specialistReasons.join("、")}</p>
+              </div>
+            ) : <p className="micro-note">現在選択された条件では専門医相談の自動表示はありません。臨床判断を優先してください。</p>}
+          </div>
+        </details>
+        <details className="reasoning-accordion" open>
+          <summary>治療終了前チェック</summary>
+          <div className="toggle-grid compact">
+            {preCompletionChecklist.map((bundleItem) => (
+              <label key={bundleItem.id} className="toggle">
+                <input type="checkbox" checked={Boolean(careBundleChecks[bundleItem.id])} onChange={() => setCareBundleChecks((current) => ({ ...current, [bundleItem.id]: !current[bundleItem.id] }))} />
+                {bundleItem.label}
+              </label>
+            ))}
+          </div>
+        </details>
+      </section>
+
+      <section className="step-block">
+        <StepHeading step="Step 8" title="感染源コントロール" lead="抗菌薬の広域化だけでは改善しない条件を確認します。" />
         <div className="toggle-grid">
           {sourceControlItems.map((item) => (
             <ToggleButton key={item} label={item} active={Boolean(sourceControl[item])} onClick={() => setSourceControl(toggleRecord(sourceControl, item))} />
@@ -579,7 +629,7 @@ export default function NavigatorApp() {
       </section>
 
       <section className="step-block">
-        <StepHeading step="Step 8" title="48-72時間後の再評価" lead="反応不良時は診断、感染源、投与設計、組織移行性を順番に見直します。" />
+        <StepHeading step="Step 9" title="48-72時間後の再評価" lead="反応不良時は診断、感染源、投与設計、組織移行性を順番に見直します。" />
         <GuideCharacter message={guideMessages.step7} />
         <div className="rules-panel"><ol>{result.infection.reassessmentPoints.map((item) => <li key={item}>{item}</li>)}</ol></div>
         <div className="toggle-grid">
@@ -596,7 +646,7 @@ export default function NavigatorApp() {
       </section>
 
       <section className="step-block summary-block">
-        <StepHeading step="Step 9" title="診療サマリー" lead="診断・処方の確定ではなく、確認事項を一画面に集約します。" />
+        <StepHeading step="Step 10" title="診療サマリー" lead="診断・処方の確定ではなく、確認事項を一画面に集約します。" />
         <div className="summary-grid">
           <SummaryItem label="感染臓器" value={result.infection.label} />
           <SummaryItem label="重症度" value={severity} onChange={setSeverity} />
