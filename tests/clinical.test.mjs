@@ -6,6 +6,7 @@ import { assessReassessment, poorResponseChecklist } from "../data/reassessmentR
 import { infectionProfiles } from "../data/infections.ts";
 import { getInfectionPathogens, infectionPathogenDatabase } from "../data/pathogens.ts";
 import { requiredCoverageFor } from "../data/infectionPathogenProfiles.ts";
+import { ceftriaxoneMonotherapyReason, getCoverageDrivenRegimens } from "../data/empiricRegimens.ts";
 import { antibiotics } from "../data/antibiotics.ts";
 import { getAntibioticReasoning } from "../lib/getAntibioticReasoning.ts";
 import { getAdministrationInstructions } from "../lib/getAdministrationInstructions.ts";
@@ -202,6 +203,36 @@ test("主要・二次起因菌から必要カバーを自動生成する", () =>
   assert.ok(requiredCoverageFor("appendicitis").includes("グラム陰性桿菌カバー"));
   assert.ok(requiredCoverageFor("appendicitis").includes("嫌気性菌カバー"));
   assert.ok(!requiredCoverageFor("cap").includes("抗MRSA薬をリスク時に追加"));
+});
+
+test("憩室炎の主要起因菌はE. coli、Klebsiella、Bacteroidesで肺炎球菌を含まない", () => {
+  const primary = infectionPathogenDatabase.diverticulitis.primaryPathogens.map((item) => item.name);
+  assert.ok(primary.some((name) => name.includes("Escherichia coli")));
+  assert.ok(primary.some((name) => name.includes("Klebsiella")));
+  assert.ok(primary.some((name) => name.includes("Bacteroides")));
+  assert.ok(!getInfectionPathogens("diverticulitis").some((item) => /肺炎球菌|Streptococcus pneumoniae/.test(item.name)));
+});
+
+test("憩室炎はCoverageを満たすレジメンを提示しCTRX単独を含まない", () => {
+  const regimens = getCoverageDrivenRegimens("diverticulitis", baseContext);
+  assert.ok(regimens.some((item) => item.label === "ABPC/SBT"));
+  assert.ok(regimens.some((item) => item.label === "CMZ"));
+  assert.ok(regimens.some((item) => item.label === "CTRX + MNZ"));
+  assert.ok(!regimens.some((item) => item.drugIds.length === 1 && item.drugIds[0] === "ceftriaxone"));
+  for (const regimen of regimens) {
+    assert.ok(regimen.coverage.includes("グラム陰性桿菌カバー"));
+    assert.ok(regimen.coverage.includes("嫌気性菌カバー"));
+  }
+});
+
+test("憩室炎のMEPMはESBLまたはAmpCリスク時だけ表示する", () => {
+  assert.ok(!getCoverageDrivenRegimens("diverticulitis", baseContext).some((item) => item.label === "MEPM"));
+  assert.ok(getCoverageDrivenRegimens("diverticulitis", { ...baseContext, esblHistory: true }).some((item) => item.label === "MEPM"));
+});
+
+test("CTRX単独を推奨しない理由に嫌気性菌カバー不足を表示する", () => {
+  assert.match(ceftriaxoneMonotherapyReason, /Bacteroides fragilis/);
+  assert.match(ceftriaxoneMonotherapyReason, /嫌気性菌のカバーが不十分/);
 });
 
 test("尿路・腹部・皮膚感染に呼吸器・髄膜炎病原体を混入させない", () => {

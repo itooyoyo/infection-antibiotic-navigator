@@ -2,6 +2,7 @@ import { antibiotics } from "../data/antibiotics.ts";
 import { alternativeDrugIds, infectionCoverageRationale, stewardshipMessages } from "../data/antibioticReasoning.ts";
 import type { AntibioticReasoningResult } from "../types/antibiotics.ts";
 import type { Antibiotic, InfectionId, PatientContext, RenalResult } from "../types/clinical.ts";
+import { ceftriaxoneMonotherapyReason } from "../data/empiricRegimens.ts";
 
 type ReasoningInput = {
   infectionId: InfectionId;
@@ -23,6 +24,14 @@ function whyForDrug(drug: Antibiotic, input: ReasoningInput) {
   if (drug.mainSpectrum.length) why.push(`主に${drug.mainSpectrum.join("、")}をカバーする候補です。`);
   if (drug.id === "cefazolin" && input.infectionId === "cellulitis") {
     why.push("CEZはβ溶血性レンサ球菌に加え、背景によりMSSAもカバーできる狭域候補です。");
+  }
+  if (input.infectionId === "diverticulitis") {
+    if (drug.id === "ampicillinSulbactam") why.push("腸内細菌目と嫌気性菌を同時にカバーできるため候補とします。地域のE. coli感受性を確認します。");
+    if (drug.id === "cefmetazole") why.push("嫌気性菌活性を有するセファマイシン系です。");
+    if (drug.id === "ceftriaxone") why.push("CTRXで腸内細菌目をカバーしますが、嫌気性菌を十分にカバーできないためMNZ併用が必要です。");
+    if (drug.id === "metronidazole") why.push("MNZでBacteroides fragilisなど嫌気性菌を補完します。");
+    if (drug.id === "piperacillinTazobactam") why.push("重症例・医療関連感染で広域カバーする候補です。");
+    if (drug.id === "meropenem") why.push("ESBLなど耐性菌リスクが高い場合のみ候補とします。");
   }
   if (drug.coversMrsa) why.push(input.context.mrsaHistory ? "MRSA既往があり、MRSA追加カバーを考慮します。" : "重症度・病型からMRSA追加カバーを検討します。");
   else why.push(input.context.mrsaHistory ? "この薬単独ではMRSAをカバーしないため、追加薬の必要性を確認します。" : "MRSAリスク因子が乏しく、MRSA薬の自動追加を避けます。");
@@ -46,6 +55,7 @@ function whyForDrug(drug: Antibiotic, input: ReasoningInput) {
 
 function alternativeReason(drug: Antibiotic, input: ReasoningInput) {
   const reasons: string[] = [];
+  if (drug.id === "ceftriaxone" && input.infectionId === "diverticulitis") reasons.push(ceftriaxoneMonotherapyReason);
   if (drug.id === "piperacillinTazobactam") {
     if (!input.context.pseudomonasHistory && !input.context.hospitalOnset) reasons.push("緑膿菌リスクが低く、抗緑膿菌スペクトラムをroutineに必要としません。");
     if (!["intraAbdominal", "cholangitis"].includes(input.infectionId) && !hasSourceControl(input, "膿瘍")) reasons.push("嫌気性菌を含む広いカバーが現時点で不要です。");

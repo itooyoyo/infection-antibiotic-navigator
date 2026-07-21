@@ -2,6 +2,7 @@ import { antibiotics } from "@/data/antibiotics";
 import { infectionProfiles } from "@/data/infections";
 import { getInfectionPathogens } from "@/data/pathogens";
 import { requiredCoverageFor } from "@/data/infectionPathogenProfiles";
+import { getCoverageDrivenRegimens } from "@/data/empiricRegimens";
 import { scoreResistanceRisk } from "@/data/resistanceRules";
 import type { InfectionId, PatientContext, RenalInput } from "@/types/clinical";
 import { calculateRenalFunction } from "@/data/renalDoseRules";
@@ -100,6 +101,7 @@ export function buildRecommendation(params: {
     reassessment,
     pathogens: getPathogens(params.infectionId),
     requiredCoverage: requiredCoverageFor(params.infectionId),
+    empiricRegimens: getCoverageDrivenRegimens(params.infectionId, params.context),
     standardCandidates: getAntibiotics(infection.standardCandidateIds),
     severeCandidates: getAntibiotics(infection.severeCandidateIds),
     alternativeCandidates: getAntibiotics(infection.alternativeCandidateIds),

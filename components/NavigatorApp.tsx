@@ -320,9 +320,19 @@ export default function NavigatorApp() {
           <p><strong>参考ガイドライン：</strong>{result.infection.reference.join(" / ")}</p>
         </div>
         <div className="candidate-layout">
-          <CandidateColumn title="標準候補" drugs={result.standardCandidates} reasoning={reasoning.selected} />
-          <CandidateColumn title="重症例候補" drugs={result.severeCandidates} reasoning={reasoning.selected} />
-          <CandidateColumn title="代替候補" drugs={result.alternativeCandidates} reasoning={reasoning.selected} />
+          {result.empiricRegimens.length > 0 ? (
+            <>
+              <RegimenColumn title="標準候補" regimens={result.empiricRegimens.filter((item) => item.category === "standard")} />
+              <RegimenColumn title="重症例候補" regimens={result.empiricRegimens.filter((item) => item.category === "severe")} />
+              <RegimenColumn title="代替候補" regimens={result.empiricRegimens.filter((item) => item.category === "alternative")} />
+            </>
+          ) : (
+            <>
+              <CandidateColumn title="標準候補" drugs={result.standardCandidates} reasoning={reasoning.selected} />
+              <CandidateColumn title="重症例候補" drugs={result.severeCandidates} reasoning={reasoning.selected} />
+              <CandidateColumn title="代替候補" drugs={result.alternativeCandidates} reasoning={reasoning.selected} />
+            </>
+          )}
         </div>
         <div className="rules-panel decision-support-panel">
           <h3>原因菌の優先順位・追加カバー条件</h3>
@@ -720,6 +730,24 @@ function CandidateColumn({ title, drugs, reasoning }: { title: string; drugs: Re
           </details>
         </article>
       ))}
+    </div>
+  );
+}
+
+function RegimenColumn({ title, regimens }: { title: string; regimens: ReturnType<typeof buildRecommendation>["empiricRegimens"] }) {
+  return (
+    <div className="candidate-column">
+      <h3>{title}</h3>
+      {regimens.map((regimen) => (
+        <article key={regimen.id}>
+          <strong>{regimen.label}</strong>
+          <p>必要なカバー：{regimen.coverage.join("、")}</p>
+          <p>Explain Why：{regimen.explainWhy}</p>
+          <p>構成薬：{regimen.drugIds.map((id) => antibiotics.find((drug) => drug.id === id)?.genericName ?? id).join(" ＋ ")}</p>
+          <p>再評価時期：48-72時間後</p>
+        </article>
+      ))}
+      {regimens.length === 0 && <p className="micro-note">この条件で自動提示する候補はありません。培養・感受性と院内プロトコルを確認してください。</p>}
     </div>
   );
 }
