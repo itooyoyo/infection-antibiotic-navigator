@@ -20,6 +20,7 @@ import { careBundleFor, commonCareBundle, diseaseCareBundles, preCompletionCheck
 import { commonStewardshipChecks, drugStewardshipChecks, stewardshipChecksForDrugIds } from "../data/stewardshipChecks.ts";
 import { emptyMedicationSafetyInput, evaluateMedicationSafety, medicationSafetyInputLabels } from "../data/medicationSafety.ts";
 import { evidenceForDrug, evidenceForRegimen, evidenceLastReviewed, evidenceLevels, evidenceReferenceCatalog } from "../data/evidenceEngine.ts";
+import { assessIvToPoSwitch, emptyIvToPoCriteria, ivToPoCautions, ivToPoCriteriaLabels, ivToPoExclusionRules, ivToPoRules, ivToPoSwitchReasons } from "../data/ivToPoSwitch.ts";
 
 const baseContext = {
   healthcareAssociated: false,
@@ -591,6 +592,100 @@ test("Evidenceは断定ではなく参考情報として表現する", () => {
     assert.doesNotMatch(evidence.summary, /必ずこの薬|絶対に|処方を確定/);
     assert.match(evidence.summary, /考え方|重要|重視|考慮|調整|評価|選択|治療/);
   }
+});
+
+const readyIvToPoCriteria = () => Object.fromEntries(ivToPoCriteriaLabels.map(([key]) => [key, true]));
+
+for (const [infectionId, expectedCandidates] of [
+  ["cap", ["AMPC", "AMPC/CVA", "CXM-AX", "LVFX"]],
+  ["pyelonephritis", ["LVFX", "CPDX-PR", "AMPC/CVA（感受性あり）"]],
+  ["cholangitis", ["AMPC/CVA", "LVFX＋MNZ"]],
+  ["cellulitis", ["CEFALEXIN", "AMPC/CVA", "CLDM"]],
+  ["diverticulitis", ["AMPC/CVA", "LVFX＋MNZ"]],
+  ["intraAbdominal", ["AMPC/CVA"]],
+]) {
+  test(`${infectionId}で指定されたPO候補を表示する`, () => {
+    const result = assessIvToPoSwitch({ infectionId, criteria: readyIvToPoCriteria() });
+    assert.equal(result.status, "consider-switch");
+    assert.deepEqual(result.oralCandidates, expectedCandidates);
+    assert.match(result.message, /切り替えを検討してください/);
+  });
+}
+
+for (const [name, input] of [
+  ["感染性心内膜炎", { infectionId: "infectiveEndocarditis" }],
+  ["細菌性髄膜炎", { infectionId: "bacterialMeningitis" }],
+  ["敗血症性ショック", { infectionId: "cap", septicShock: true }],
+  ["持続菌血症", { infectionId: "pyelonephritis", persistentBacteremia: true }],
+  ["壊死性筋膜炎", { infectionId: "necrotizingFasciitis" }],
+]) {
+  test(`${name}ではIV継続を検討する`, () => {
+    const result = assessIvToPoSwitch({ ...input, criteria: readyIvToPoCriteria() });
+    assert.equal(result.status, "continue-iv");
+    assert.equal(result.message, "IV継続を検討してください。");
+    assert.ok(result.exclusionReasons.includes(name));
+  });
+}
+
+for (const [key, label] of ivToPoCriteriaLabels) {
+  test(`IV→PO評価で「${label}」未確認を検出する`, () => {
+    const criteria = readyIvToPoCriteria();
+    criteria[key] = false;
+    const result = assessIvToPoSwitch({ infectionId: "cap", criteria });
+    assert.equal(result.status, "not-ready");
+    assert.ok(result.unmetCriteria.includes(label));
+  });
+}
+
+test("非呼吸器感染では酸素化項目を必須にしない", () => {
+  const criteria = readyIvToPoCriteria();
+  criteria.improvedOxygenation = false;
+  assert.equal(assessIvToPoSwitch({ infectionId: "cellulitis", criteria }).status, "consider-switch");
+});
+
+test("呼吸器感染では酸素化改善を必須評価する", () => {
+  const criteria = readyIvToPoCriteria();
+  criteria.improvedOxygenation = false;
+  assert.ok(assessIvToPoSwitch({ infectionId: "cap", criteria }).unmetCriteria.some((item) => item.includes("酸素化")));
+});
+
+test("IV→POルールは6疾患・15候補を保持する", () => {
+  assert.equal(ivToPoRules.length, 6);
+  assert.equal(ivToPoRules.reduce((count, rule) => count + rule.oralCandidates.length, 0), 15);
+});
+
+test("IV→PO切替不可ルールは5件を保持する", () => assert.equal(ivToPoExclusionRules.length, 5));
+test("IV→PO切替理由は4件を表示する", () => assert.deepEqual(ivToPoSwitchReasons, ["入院期間短縮", "カテーテル感染予防", "医療費軽減", "患者QOL向上"]));
+test("IV→PO注意点は培養・吸収・施設プロトコルを表示する", () => {
+  assert.equal(ivToPoCautions.length, 3);
+  const text = ivToPoCautions.join("、");
+  for (const term of ["培養", "経口吸収", "施設プロトコル"]) assert.ok(text.includes(term), term);
+});
+
+test("IV→PO評価は現在薬を保持する", () => {
+  const result = assessIvToPoSwitch({ infectionId: "cap", criteria: readyIvToPoCriteria(), currentDrugs: ["セフトリアキソン", "アジスロマイシン"] });
+  assert.deepEqual(result.currentDrugs, ["セフトリアキソン", "アジスロマイシン"]);
+});
+
+test("対象疾患に個別ルールがない場合は自動切替を提案しない", () => {
+  const result = assessIvToPoSwitch({ infectionId: "osteomyelitis", criteria: readyIvToPoCriteria() });
+  assert.equal(result.status, "no-rule");
+  assert.doesNotMatch(result.message, /^IV→PO切り替えを検討してください/);
+});
+
+test("IV→PO Evidenceを疾患別に複数表示する", () => {
+  for (const rule of ivToPoRules) assert.ok(rule.evidence.length >= 2, rule.infectionId);
+  assert.ok(ivToPoRules.find((rule) => rule.infectionId === "cap").evidence.some((item) => item.includes("CAP")));
+  assert.ok(ivToPoRules.find((rule) => rule.infectionId === "pyelonephritis").evidence.some((item) => item.includes("2025")));
+});
+
+test("IV→PO結果は切替を断定しない", () => {
+  const results = [
+    assessIvToPoSwitch({ infectionId: "cap", criteria: readyIvToPoCriteria() }),
+    assessIvToPoSwitch({ infectionId: "cap", criteria: emptyIvToPoCriteria() }),
+    assessIvToPoSwitch({ infectionId: "infectiveEndocarditis", criteria: readyIvToPoCriteria() }),
+  ];
+  for (const result of results) assert.doesNotMatch(result.message, /切り替えてください|必ず切り替え/);
 });
 
 test("監査対象では軽症にMEPMを第一選択表示しない", () => {

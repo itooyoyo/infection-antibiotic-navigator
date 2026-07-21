@@ -21,6 +21,7 @@ import { careBundleFor, preCompletionChecklist, specialistConsultReasons } from 
 import { commonStewardshipChecks, stewardshipChecksForDrugIds } from "@/data/stewardshipChecks";
 import { emptyMedicationSafetyInput, evaluateMedicationSafety, medicationSafetyInputLabels, type MedicationSafetyInput } from "@/data/medicationSafety";
 import { evidenceForDrug, evidenceForRegimen, type RegimenEvidence } from "@/data/evidenceEngine";
+import { assessIvToPoSwitch, emptyIvToPoCriteria, ivToPoCriteriaLabels, type IvToPoCriteriaInput } from "@/data/ivToPoSwitch";
 
 const redFlagItems = [
   "収縮期血圧低下",
@@ -186,6 +187,8 @@ export default function NavigatorApp() {
   const [unexplainedFever, setUnexplainedFever] = useState(false);
   const [stewardshipCheckState, setStewardshipCheckState] = useState<Record<string, boolean>>({});
   const [medicationSafety, setMedicationSafety] = useState<MedicationSafetyInput>(() => emptyMedicationSafetyInput());
+  const [ivToPoCriteria, setIvToPoCriteria] = useState<IvToPoCriteriaInput>(() => emptyIvToPoCriteria());
+  const [persistentBacteremia, setPersistentBacteremia] = useState(false);
 
   const result = useMemo(
     () => buildRecommendation({ infectionId, context, redFlags, sourceControl, renalInput: renal, reassessment }),
@@ -232,6 +235,13 @@ export default function NavigatorApp() {
     hemodialysis: medicationSafety.hemodialysis || renal.hemodialysis,
     peritonealDialysis: medicationSafety.peritonealDialysis || renal.peritonealDialysis,
     crrt: medicationSafety.crrt || renal.crrt,
+  });
+  const ivToPoAssessment = assessIvToPoSwitch({
+    infectionId,
+    criteria: ivToPoCriteria,
+    currentDrugs: currentTherapyIds.map((id) => antibiotics.find((drug) => drug.id === id)?.genericName ?? id),
+    septicShock: Object.entries(redFlags).some(([key, active]) => active && /ショック|血圧|乳酸|末梢循環/.test(key)),
+    persistentBacteremia,
   });
 
   return (
@@ -647,7 +657,41 @@ export default function NavigatorApp() {
       </section>
 
       <section className="step-block">
-        <StepHeading step="Step 9" title="Clinical Care Bundle" lead="抗菌薬選択後に必要な評価・培養・感染源コントロールをチェックします。" />
+        <StepHeading step="Step 9" title="IV→PO Switch" lead="臨床安定性・経口吸収・培養結果・感染症別の例外を確認し、静注から経口への切り替え可否を検討します。" />
+        <details className="reasoning-accordion" open>
+          <summary>IV→PO評価チェックリスト</summary>
+          <div className="toggle-grid compact">
+            {ivToPoCriteriaLabels.map(([key, label]) => (
+              <label key={key} className="toggle">
+                <input type="checkbox" checked={ivToPoCriteria[key]} onChange={() => setIvToPoCriteria((current) => ({ ...current, [key]: !current[key] }))} />
+                {label}
+              </label>
+            ))}
+            <label className="toggle">
+              <input type="checkbox" checked={persistentBacteremia} onChange={() => setPersistentBacteremia((value) => !value)} />
+              持続菌血症
+            </label>
+          </div>
+        </details>
+        <details className="reasoning-accordion" open>
+          <summary>切り替え評価</summary>
+          <div className={`ivpo-result ${ivToPoAssessment.status}`}>
+            <strong>{ivToPoAssessment.message}</strong>
+            <div className="dose-guidance-grid">
+              <InfoBlock label="現在薬" values={ivToPoAssessment.currentDrugs.length ? ivToPoAssessment.currentDrugs : ["未選択：Step 8で現在薬を選択してください。"]} />
+              <InfoBlock label="PO候補" values={ivToPoAssessment.oralCandidates.length ? ivToPoAssessment.oralCandidates : ["個別評価が必要です。"]} />
+              <InfoBlock label="切替理由" values={ivToPoAssessment.reasons} />
+              <InfoBlock label="Evidence" values={ivToPoAssessment.evidence} />
+              <InfoBlock label="注意点" values={ivToPoAssessment.cautions} />
+              {ivToPoAssessment.unmetCriteria.length > 0 && <InfoBlock label="未確認項目" values={ivToPoAssessment.unmetCriteria} />}
+              {ivToPoAssessment.exclusionReasons.length > 0 && <InfoBlock label="IV継続検討理由" values={ivToPoAssessment.exclusionReasons} />}
+            </div>
+          </div>
+        </details>
+      </section>
+
+      <section className="step-block">
+        <StepHeading step="Step 10" title="Clinical Care Bundle" lead="抗菌薬選択後に必要な評価・培養・感染源コントロールをチェックします。" />
         <details className="reasoning-accordion" open>
           <summary>共通・疾患別チェックリスト</summary>
           <div className="toggle-grid compact">
@@ -685,7 +729,7 @@ export default function NavigatorApp() {
       </section>
 
       <section className="step-block">
-        <StepHeading step="Step 10" title="感染源コントロール" lead="抗菌薬の広域化だけでは改善しない条件を確認します。" />
+        <StepHeading step="Step 11" title="感染源コントロール" lead="抗菌薬の広域化だけでは改善しない条件を確認します。" />
         <div className="toggle-grid">
           {sourceControlItems.map((item) => (
             <ToggleButton key={item} label={item} active={Boolean(sourceControl[item])} onClick={() => setSourceControl(toggleRecord(sourceControl, item))} />
@@ -700,7 +744,7 @@ export default function NavigatorApp() {
       </section>
 
       <section className="step-block">
-        <StepHeading step="Step 11" title="48-72時間後の再評価" lead="反応不良時は診断、感染源、投与設計、組織移行性を順番に見直します。" />
+        <StepHeading step="Step 12" title="48-72時間後の再評価" lead="反応不良時は診断、感染源、投与設計、組織移行性を順番に見直します。" />
         <GuideCharacter message={guideMessages.step7} />
         <div className="rules-panel"><ol>{result.infection.reassessmentPoints.map((item) => <li key={item}>{item}</li>)}</ol></div>
         <div className="toggle-grid">
@@ -717,7 +761,7 @@ export default function NavigatorApp() {
       </section>
 
       <section className="step-block summary-block">
-        <StepHeading step="Step 12" title="診療サマリー" lead="診断・処方の確定ではなく、確認事項を一画面に集約します。" />
+        <StepHeading step="Step 13" title="診療サマリー" lead="診断・処方の確定ではなく、確認事項を一画面に集約します。" />
         <div className="summary-grid">
           <SummaryItem label="感染臓器" value={result.infection.label} />
           <SummaryItem label="重症度" value={severity} onChange={setSeverity} />
