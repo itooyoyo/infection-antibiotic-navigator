@@ -284,6 +284,7 @@ export default function NavigatorApp() {
               <p>{pathogen.why}</p>
               <ul>
                 <li>背景：{pathogen.increasedBy}</li>
+                <li>必要なカバー：{pathogen.recommendedCoverage.join("、") || "培養・感受性と病型で決定"}</li>
                 <li>検査：{pathogen.tests}</li>
                 <li>βラクタム：{pathogen.betaLactamGap}</li>
                 <li>細胞内寄生菌：{pathogen.intracellular ? "はい" : "いいえ"} / 嫌気性菌：{pathogen.anaerobe ? "はい" : "いいえ"}</li>

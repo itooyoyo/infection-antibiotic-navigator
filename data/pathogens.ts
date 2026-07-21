@@ -1,5 +1,6 @@
 import type { InfectionId } from "@/types/clinical";
 import { infectionProfiles } from "./infections.ts";
+import { infectionSpecificPathogenProfiles, type PathogenProfileItem } from "./infectionPathogenProfiles.ts";
 
 export type GramStain = "Gram陽性" | "Gram陰性" | "Gram染色で評価困難";
 export type OxygenRequirement = "好気性" | "通性嫌気性" | "嫌気性" | "偏性細胞内寄生";
@@ -29,6 +30,8 @@ export type PathogenNote = {
   intracellular: boolean;
   anaerobe: boolean;
   resistanceRisk: string;
+  riskFactors: string[];
+  recommendedCoverage: string[];
 };
 
 export const pathogens: Pathogen[] = [
@@ -356,6 +359,8 @@ function note(id: string, tier: PathogenNote["tier"], why: string): PathogenNote
     intracellular: pathogen.intracellular,
     anaerobe: pathogen.oxygenRequirement === "嫌気性",
     resistanceRisk: pathogen.resistanceProne,
+    riskFactors: [...pathogen.riskFactors],
+    recommendedCoverage: [],
   };
 }
 
@@ -455,6 +460,8 @@ function customNote(
     intracellular: options.intracellular ?? false,
     anaerobe: options.anaerobe ?? false,
     resistanceRisk: options.resistanceRisk ?? "中等度",
+    riskFactors: (options.increasedBy ?? "感染部位、重症度、医療曝露、培養結果で評価").split("、"),
+    recommendedCoverage: [],
   };
 }
 
@@ -484,12 +491,12 @@ function genericProfile(id: InfectionId): InfectionPathogenProfile {
 
 const allInfectionIds = infectionProfiles.map((profile) => profile.id);
 
-export const infectionPathogenDatabase = Object.fromEntries(
+const legacyInfectionPathogenDatabase = Object.fromEntries(
   allInfectionIds.map((id) => [id, genericProfile(id)]),
 ) as Record<InfectionId, InfectionPathogenProfile>;
 
 // 腹部感染症は各疾患で独立した配列を持ち、呼吸器病原体を流用しない。
-infectionPathogenDatabase.diverticulitis = {
+legacyInfectionPathogenDatabase.diverticulitis = {
   primaryPathogens: [
     customNote("Escherichia coli", "priority", "大腸内細菌叢の代表菌です。"),
     customNote("Klebsiella spp.", "priority", "腸内細菌目として大腸由来感染で考慮します。"),
@@ -500,14 +507,14 @@ infectionPathogenDatabase.diverticulitis = {
   secondaryPathogens: [customNote("Enterococcus spp.", "additional", "胆道感染や院内感染、術後などで考慮します。")],
   specialSituationPathogens: [],
 };
-infectionPathogenDatabase.appendicitis = {
+legacyInfectionPathogenDatabase.appendicitis = {
   primaryPathogens: [
     customNote("Escherichia coli", "priority", "大腸内細菌叢の代表菌です。"),
     customNote("Bacteroides fragilis", "priority", "大腸由来嫌気性菌の代表です。", { anaerobe: true }),
     customNote("その他嫌気性菌", "priority", "虫垂内腔由来の混合感染で重要です。", { anaerobe: true }),
   ], secondaryPathogens: [], specialSituationPathogens: [],
 };
-infectionPathogenDatabase.cholangitis = {
+legacyInfectionPathogenDatabase.cholangitis = {
   primaryPathogens: [
     customNote("Escherichia coli", "priority", "腸管由来の代表的な胆道感染菌です。"),
     customNote("Klebsiella spp.", "priority", "胆汁培養で主要な腸内細菌目として検出されます。"),
@@ -516,14 +523,14 @@ infectionPathogenDatabase.cholangitis = {
   ], secondaryPathogens: [],
   specialSituationPathogens: [customNote("Pseudomonas aeruginosa", "missable", "重症例または医療関連・胆道処置後で追加評価します。", { increasedBy: "Grade III、医療関連、胆道処置、過去検出" })],
 };
-infectionPathogenDatabase.cholecystitis = {
+legacyInfectionPathogenDatabase.cholecystitis = {
   primaryPathogens: [
     customNote("Escherichia coli", "priority", "腸管由来の代表的な胆道感染菌です。"),
     customNote("Klebsiella spp.", "priority", "胆道感染で主要な腸内細菌目として考慮します。"),
     customNote("Enterococcus spp.", "priority", "胆道感染や院内感染で考慮します。"),
   ], secondaryPathogens: [], specialSituationPathogens: [],
 };
-infectionPathogenDatabase.peritonitis = {
+legacyInfectionPathogenDatabase.peritonitis = {
   primaryPathogens: [
     customNote("Escherichia coli", "priority", "消化管穿孔に伴う代表的な腸内細菌目です。"),
     customNote("Klebsiella spp.", "priority", "二次性腹膜炎で考慮する腸内細菌目です。"),
@@ -532,7 +539,7 @@ infectionPathogenDatabase.peritonitis = {
     customNote("Enterococcus spp.", "priority", "二次性腹膜炎、術後・院内感染で考慮します。"),
   ], secondaryPathogens: [], specialSituationPathogens: [],
 };
-infectionPathogenDatabase.intraAbdominal = {
+legacyInfectionPathogenDatabase.intraAbdominal = {
   primaryPathogens: [
     customNote("Escherichia coli", "priority", "消化管由来腹腔内膿瘍の代表菌です。"),
     customNote("Klebsiella spp.", "priority", "腹腔内膿瘍で考慮する腸内細菌目です。"),
@@ -541,7 +548,7 @@ infectionPathogenDatabase.intraAbdominal = {
     customNote("Enterococcus spp.", "priority", "術後・院内感染や胆道由来で考慮します。"),
   ], secondaryPathogens: [], specialSituationPathogens: [],
 };
-infectionPathogenDatabase.liverAbscess = {
+legacyInfectionPathogenDatabase.liverAbscess = {
   primaryPathogens: [
     customNote("Klebsiella pneumoniae", "priority", "化膿性肝膿瘍の主要菌で、糖尿病や侵襲性感染にも注意します。"),
     customNote("Escherichia coli", "priority", "胆道・腸管由来の代表的な腸内細菌目です。"),
@@ -551,7 +558,7 @@ infectionPathogenDatabase.liverAbscess = {
 };
 
 // 最新要件では皮膚感染の標準表示に呼吸器病原体を混在させない。
-infectionPathogenDatabase.cellulitis = {
+legacyInfectionPathogenDatabase.cellulitis = {
   primaryPathogens: [
     note("streptococcus-pyogenes", "priority", "典型的な非化膿性蜂窩織炎で最優先します。"),
     note("beta-hemolytic-streptococci", "priority", "A群以外も主要起因菌として優先します。"),
@@ -563,11 +570,32 @@ infectionPathogenDatabase.cellulitis = {
   specialSituationPathogens: [],
 };
 
+function fromSpecific(item: PathogenProfileItem, tier: PathogenNote["tier"]): PathogenNote {
+  return {
+    name: item.name,
+    tier,
+    why: item.explainWhy,
+    increasedBy: item.riskFactors.join("、"),
+    tests: "感染巣培養・感受性検査を病型と重症度に応じて実施",
+    betaLactamGap: item.recommendedCoverage.join("、"),
+    intracellular: false,
+    anaerobe: item.recommendedCoverage.some((coverage) => coverage.includes("嫌気性菌")),
+    resistanceRisk: "菌種・施設疫学で評価",
+    riskFactors: [...item.riskFactors],
+    recommendedCoverage: [...item.recommendedCoverage],
+  };
+}
+
+export const infectionPathogenDatabase = infectionSpecificPathogenProfiles;
+
 export function getInfectionPathogens(id: InfectionId): PathogenNote[] {
-  const profile = infectionPathogenDatabase[id];
+  const data = infectionSpecificPathogenProfiles[id];
   return [
-    ...profile.primaryPathogens.map((item) => ({ ...item, tier: "priority" as const })),
-    ...profile.secondaryPathogens.map((item) => ({ ...item, tier: "additional" as const })),
-    ...profile.specialSituationPathogens.map((item) => ({ ...item, tier: "missable" as const })),
+    ...data.primaryPathogens.map((item) => fromSpecific(item, "priority")),
+    ...data.secondaryPathogens.map((item) => fromSpecific(item, "additional")),
+    ...data.healthcareAssociatedPathogens.map((item) => fromSpecific(item, "missable")),
+    ...data.immunocompromisedPathogens.map((item) => fromSpecific(item, "missable")),
+    ...data.postoperativePathogens.map((item) => fromSpecific(item, "missable")),
+    ...data.rarePathogens.map((item) => fromSpecific(item, "missable")),
   ];
 }

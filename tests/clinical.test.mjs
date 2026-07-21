@@ -5,6 +5,7 @@ import { calculateRenalFunction } from "../data/renalDoseRules.ts";
 import { assessReassessment, poorResponseChecklist } from "../data/reassessmentRules.ts";
 import { infectionProfiles } from "../data/infections.ts";
 import { getInfectionPathogens, infectionPathogenDatabase } from "../data/pathogens.ts";
+import { requiredCoverageFor } from "../data/infectionPathogenProfiles.ts";
 import { antibiotics } from "../data/antibiotics.ts";
 import { getAntibioticReasoning } from "../lib/getAntibioticReasoning.ts";
 import { getAdministrationInstructions } from "../lib/getAdministrationInstructions.ts";
@@ -141,13 +142,12 @@ test("培養判明後の狭域化", () => {
   assert.equal(reassessment.ivToOralReady, true);
 });
 
-test("蜂窩織炎はβ溶血性レンサ球菌を優先し肺炎球菌を標準表示しない", () => {
+test("蜂窩織炎はβ溶血性レンサ球菌とMSSAを優先し肺炎球菌を表示しない", () => {
   const cellulitis = getInfectionPathogens("cellulitis");
-  assert.deepEqual(
-    cellulitis.filter((item) => item.tier === "priority").map((item) => item.name),
-    ["Streptococcus pyogenes（A群溶血性レンサ球菌）", "その他β溶血性レンサ球菌（B・C・G群など）"],
-  );
-  assert.ok(!cellulitis.some((item) => item.name === "肺炎球菌"));
+  const primary = cellulitis.filter((item) => item.tier === "priority").map((item) => item.name);
+  assert.ok(primary.some((name) => name.includes("β溶血性レンサ球菌")));
+  assert.ok(primary.some((name) => name.includes("MSSA")));
+  assert.ok(!cellulitis.some((item) => /Streptococcus pneumoniae|肺炎球菌/.test(item.name)));
   assert.ok(!infectionProfiles.find((item) => item.id === "cellulitis").suspectedPathogenIds.includes("streptococcus-pneumoniae"));
 });
 
@@ -162,20 +162,46 @@ test("蜂窩織炎にE. coliをデフォルト表示しない", () => {
 });
 
 test("肺炎と髄膜炎には肺炎球菌を表示する", () => {
-  assert.ok(getInfectionPathogens("cap").some((item) => item.name.includes("肺炎球菌")));
-  assert.ok(getInfectionPathogens("bacterialMeningitis").some((item) => item.name.includes("肺炎球菌")));
+  assert.ok(getInfectionPathogens("cap").some((item) => /Streptococcus pneumoniae|肺炎球菌/.test(item.name)));
+  assert.ok(getInfectionPathogens("bacterialMeningitis").some((item) => /Streptococcus pneumoniae|肺炎球菌/.test(item.name)));
 });
 
-test("全感染症が独立した3区分の起因菌データを持つ", () => {
+test("全感染症が独立した6区分の起因菌データを持つ", () => {
   assert.equal(Object.keys(infectionPathogenDatabase).length, infectionProfiles.length);
   for (const profile of infectionProfiles) {
     const data = infectionPathogenDatabase[profile.id];
     assert.ok(Array.isArray(data.primaryPathogens), `${profile.id}: primaryPathogens`);
     assert.ok(Array.isArray(data.secondaryPathogens), `${profile.id}: secondaryPathogens`);
-    assert.ok(Array.isArray(data.specialSituationPathogens), `${profile.id}: specialSituationPathogens`);
+    assert.ok(Array.isArray(data.healthcareAssociatedPathogens), `${profile.id}: healthcareAssociatedPathogens`);
+    assert.ok(Array.isArray(data.immunocompromisedPathogens), `${profile.id}: immunocompromisedPathogens`);
+    assert.ok(Array.isArray(data.postoperativePathogens), `${profile.id}: postoperativePathogens`);
+    assert.ok(Array.isArray(data.rarePathogens), `${profile.id}: rarePathogens`);
   }
-  const arrays = Object.values(infectionPathogenDatabase).flatMap((item) => [item.primaryPathogens, item.secondaryPathogens, item.specialSituationPathogens]);
+  const arrays = Object.values(infectionPathogenDatabase).flatMap((item) => [item.primaryPathogens, item.secondaryPathogens, item.healthcareAssociatedPathogens, item.immunocompromisedPathogens, item.postoperativePathogens, item.rarePathogens]);
   assert.equal(new Set(arrays).size, arrays.length, "感染症間で起因菌配列を共有しない");
+});
+
+for (const [title, infectionId, pathogen, expected] of [
+  ["市中肺炎は肺炎球菌あり", "cap", /Streptococcus pneumoniae|肺炎球菌/, true],
+  ["髄膜炎は肺炎球菌あり", "bacterialMeningitis", /Streptococcus pneumoniae|肺炎球菌/, true],
+  ["蜂窩織炎は肺炎球菌なし", "cellulitis", /Streptococcus pneumoniae|肺炎球菌/, false],
+  ["憩室炎は肺炎球菌なし", "diverticulitis", /Streptococcus pneumoniae|肺炎球菌/, false],
+  ["胆管炎は肺炎球菌なし", "cholangitis", /Streptococcus pneumoniae|肺炎球菌/, false],
+  ["腎盂腎炎は肺炎球菌なし", "pyelonephritis", /Streptococcus pneumoniae|肺炎球菌/, false],
+  ["市中肺炎はE. coliなし", "cap", /Escherichia coli|E\. coli|大腸菌/, false],
+  ["髄膜炎はE. coliなし", "bacterialMeningitis", /Escherichia coli|E\. coli|大腸菌/, false],
+  ["肝膿瘍はKlebsiellaあり", "liverAbscess", /Klebsiella/, true],
+  ["虫垂炎はBacteroidesあり", "appendicitis", /Bacteroides/, true],
+]) {
+  test(title, () => {
+    assert.equal(getInfectionPathogens(infectionId).some((item) => pathogen.test(item.name)), expected);
+  });
+}
+
+test("主要・二次起因菌から必要カバーを自動生成する", () => {
+  assert.ok(requiredCoverageFor("appendicitis").includes("グラム陰性桿菌カバー"));
+  assert.ok(requiredCoverageFor("appendicitis").includes("嫌気性菌カバー"));
+  assert.ok(!requiredCoverageFor("cap").includes("抗MRSA薬をリスク時に追加"));
 });
 
 test("尿路・腹部・皮膚感染に呼吸器・髄膜炎病原体を混入させない", () => {
