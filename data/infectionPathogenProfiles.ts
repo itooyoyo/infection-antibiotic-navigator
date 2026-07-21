@@ -60,6 +60,7 @@ export const infectionSpecificPathogenProfiles: Record<InfectionId, InfectionSpe
   diabeticFootInfection: profile([staph(), strep()], [p("Enterobacterales", "慢性・中等症以上や抗菌薬曝露で追加します。", ["慢性潰瘍", "直近抗菌薬", "中等症以上"], ["グラム陰性桿菌カバーを重症度で検討"]), anaerobes("虚血・壊死・悪臭を伴う感染で考慮します。")], [pseudomonas(), mrsa()]),
   lowerUti: profile([ecoli()], [klebsiella(), p("Proteus mirabilis", "尿路結石や複雑性背景で考慮します。", ["結石", "尿路異常"], ["グラム陰性桿菌カバー"])], [pseudomonas(), enterococcus()]),
   pyelonephritis: profile([ecoli()], [klebsiella(), p("Proteus mirabilis", "上部尿路感染、結石・閉塞で考慮します。", ["結石", "閉塞"], ["グラム陰性桿菌カバー"])], [pseudomonas(), enterococcus()]),
+  prostatitis: profile([ecoli("急性細菌性前立腺炎の過半数を占める主要起因菌です。")], [klebsiella(), p("Proteus mirabilis", "尿路異常を伴う前立腺炎で考慮します。", ["尿路異常", "結石"], ["グラム陰性桿菌カバー"])], [pseudomonas(), enterococcus()]),
   complicatedUti: profile([ecoli()], [klebsiella(), p("Proteus mirabilis", "尿路異常・結石で考慮します。", ["結石", "尿路異常"], ["グラム陰性桿菌カバー"])], [pseudomonas(), enterococcus(), p("Enterobacter spp.", "医療関連のAmpCリスク菌として考慮します。", ["医療関連", "直近抗菌薬"], ["AmpCリスクを踏まえたカバー"])]),
   obstructivePyelonephritis: profile([ecoli()], [klebsiella(), p("Proteus mirabilis", "結石形成と閉塞性尿路感染で重要です。", ["尿路結石", "閉塞"], ["グラム陰性桿菌カバー"])], [pseudomonas(), enterococcus()]),
   cauti: profile([ecoli()], [klebsiella(), p("Proteus mirabilis", "カテーテル関連のバイオフィルム菌として考慮します。", ["長期カテーテル"], ["グラム陰性桿菌カバー"])], [pseudomonas(), enterococcus()]),

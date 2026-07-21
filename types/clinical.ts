@@ -13,6 +13,7 @@ export type InfectionId =
   | "diabeticFootInfection"
   | "lowerUti"
   | "pyelonephritis"
+  | "prostatitis"
   | "complicatedUti"
   | "obstructivePyelonephritis"
   | "cauti"

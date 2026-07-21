@@ -1,6 +1,6 @@
 import { antibiotics } from "@/data/antibiotics";
 import { infectionProfiles } from "@/data/infections";
-import { getInfectionPathogens } from "@/data/pathogens";
+import { getContextualInfectionPathogens } from "@/data/pathogens";
 import { requiredCoverageFor } from "@/data/infectionPathogenProfiles";
 import { getCoverageDrivenRegimens } from "@/data/empiricRegimens";
 import { scoreResistanceRisk } from "@/data/resistanceRules";
@@ -32,8 +32,16 @@ export function getAntibiotics(ids: string[]) {
 }
 
 export function getPathogens(id: InfectionId) {
-  return getInfectionPathogens(id);
+  return getContextualInfectionPathogens(id, defaultPathogenContext);
 }
+
+const defaultPathogenContext: PatientContext = {
+  healthcareAssociated: false, hospitalOnset: false, recentHospitalization: false, recentAntibiotics: false, priorCulture: false,
+  mrsaHistory: false, esblHistory: false, ampCHistory: false, creHistory: false, pseudomonasHistory: false, stenotrophomonasHistory: false,
+  longTermCare: false, dialysis: false, urinaryCatheter: false, centralVenousCatheter: false, prostheticMaterial: false,
+  structuralLungDisease: false, aspirationRisk: false, diabetes: false, immunosuppression: false, neutropenia: false,
+  recentSurgery: false, drugAllergy: false, antibiogramAvailable: false,
+};
 
 export function evaluateRedFlags(redFlags: RedFlagState, infectionId: InfectionId) {
   const active = Object.entries(redFlags)
@@ -99,7 +107,7 @@ export function buildRecommendation(params: {
     sourceControlResult,
     renal,
     reassessment,
-    pathogens: getPathogens(params.infectionId),
+    pathogens: getContextualInfectionPathogens(params.infectionId, params.context),
     requiredCoverage: requiredCoverageFor(params.infectionId),
     empiricRegimens: getCoverageDrivenRegimens(params.infectionId, params.context),
     standardCandidates: getAntibiotics(infection.standardCandidateIds),

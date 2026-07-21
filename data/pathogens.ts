@@ -1,4 +1,4 @@
-import type { InfectionId } from "@/types/clinical";
+import type { InfectionId, PatientContext } from "@/types/clinical";
 import { infectionProfiles } from "./infections.ts";
 import { infectionSpecificPathogenProfiles, type PathogenProfileItem } from "./infectionPathogenProfiles.ts";
 
@@ -598,4 +598,14 @@ export function getInfectionPathogens(id: InfectionId): PathogenNote[] {
     ...data.postoperativePathogens.map((item) => fromSpecific(item, "missable")),
     ...data.rarePathogens.map((item) => fromSpecific(item, "missable")),
   ];
+}
+
+export function getContextualInfectionPathogens(id: InfectionId, context: PatientContext): PathogenNote[] {
+  const mrsaRisk = context.mrsaHistory || context.dialysis || context.centralVenousCatheter || context.recentHospitalization;
+  const pseudomonasRisk = context.pseudomonasHistory || context.healthcareAssociated || context.hospitalOnset || context.recentAntibiotics;
+  return getInfectionPathogens(id).filter((item) => {
+    if (/MRSA/.test(item.name) && !mrsaRisk && !["necrotizingFasciitis", "bacterialMeningitis", "infectiveEndocarditis"].includes(id)) return false;
+    if (/Pseudomonas|緑膿菌/.test(item.name) && !pseudomonasRisk && !["hap", "vap"].includes(id)) return false;
+    return true;
+  });
 }
