@@ -4,7 +4,7 @@ import { scoreResistanceRisk } from "../data/resistanceRules.ts";
 import { calculateRenalFunction } from "../data/renalDoseRules.ts";
 import { assessReassessment, poorResponseChecklist } from "../data/reassessmentRules.ts";
 import { infectionProfiles } from "../data/infections.ts";
-import { pathogenProfiles } from "../data/pathogens.ts";
+import { getInfectionPathogens, infectionPathogenDatabase } from "../data/pathogens.ts";
 import { antibiotics } from "../data/antibiotics.ts";
 import { getAntibioticReasoning } from "../lib/getAntibioticReasoning.ts";
 import { getAdministrationInstructions } from "../lib/getAdministrationInstructions.ts";
@@ -142,13 +142,46 @@ test("培養判明後の狭域化", () => {
 });
 
 test("蜂窩織炎はβ溶血性レンサ球菌を優先し肺炎球菌を標準表示しない", () => {
-  const cellulitis = pathogenProfiles.cellulitis;
+  const cellulitis = getInfectionPathogens("cellulitis");
   assert.deepEqual(
     cellulitis.filter((item) => item.tier === "priority").map((item) => item.name),
     ["Streptococcus pyogenes（A群溶血性レンサ球菌）", "その他β溶血性レンサ球菌（B・C・G群など）"],
   );
-  assert.equal(cellulitis.find((item) => item.name === "肺炎球菌")?.tier, "missable");
+  assert.ok(!cellulitis.some((item) => item.name === "肺炎球菌"));
   assert.ok(!infectionProfiles.find((item) => item.id === "cellulitis").suspectedPathogenIds.includes("streptococcus-pneumoniae"));
+});
+
+test("腹部感染症に肺炎球菌を表示しない", () => {
+  for (const id of ["diverticulitis", "appendicitis", "cholangitis"]) {
+    assert.ok(!getInfectionPathogens(id).some((item) => item.name.includes("肺炎球菌")), id);
+  }
+});
+
+test("蜂窩織炎にE. coliをデフォルト表示しない", () => {
+  assert.ok(!getInfectionPathogens("cellulitis").some((item) => /E\. coli|大腸菌|Escherichia coli/.test(item.name)));
+});
+
+test("肺炎と髄膜炎には肺炎球菌を表示する", () => {
+  assert.ok(getInfectionPathogens("cap").some((item) => item.name.includes("肺炎球菌")));
+  assert.ok(getInfectionPathogens("bacterialMeningitis").some((item) => item.name.includes("肺炎球菌")));
+});
+
+test("全感染症が独立した3区分の起因菌データを持つ", () => {
+  assert.equal(Object.keys(infectionPathogenDatabase).length, infectionProfiles.length);
+  for (const profile of infectionProfiles) {
+    const data = infectionPathogenDatabase[profile.id];
+    assert.ok(Array.isArray(data.primaryPathogens), `${profile.id}: primaryPathogens`);
+    assert.ok(Array.isArray(data.secondaryPathogens), `${profile.id}: secondaryPathogens`);
+    assert.ok(Array.isArray(data.specialSituationPathogens), `${profile.id}: specialSituationPathogens`);
+  }
+  const arrays = Object.values(infectionPathogenDatabase).flatMap((item) => [item.primaryPathogens, item.secondaryPathogens, item.specialSituationPathogens]);
+  assert.equal(new Set(arrays).size, arrays.length, "感染症間で起因菌配列を共有しない");
+});
+
+test("尿路・腹部・皮膚感染に呼吸器・髄膜炎病原体を混入させない", () => {
+  const audited = ["lowerUti", "pyelonephritis", "complicatedUti", "obstructivePyelonephritis", "cauti", "cholangitis", "cholecystitis", "intraAbdominal", "appendicitis", "diverticulitis", "peritonitis", "liverAbscess", "cellulitis", "abscess", "necrotizingFasciitis", "diabeticFootInfection"];
+  const forbidden = /肺炎球菌|インフルエンザ菌|モラクセラ|Moraxella|髄膜炎菌/;
+  for (const id of audited) assert.ok(!getInfectionPathogens(id).some((item) => forbidden.test(item.name)), id);
 });
 
 test("全感染症にSource Controlと反応不良時の共通再評価項目がある", () => {

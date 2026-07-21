@@ -1,13 +1,12 @@
 import { antibiotics } from "@/data/antibiotics";
 import { infectionProfiles } from "@/data/infections";
-import { pathogenProfiles } from "@/data/pathogens";
+import { getInfectionPathogens } from "@/data/pathogens";
 import { scoreResistanceRisk } from "@/data/resistanceRules";
 import type { InfectionId, PatientContext, RenalInput } from "@/types/clinical";
 import { calculateRenalFunction } from "@/data/renalDoseRules";
 import { assessReassessment, type ReassessmentInput } from "@/data/reassessmentRules";
 import type { Antibiotic } from "@/types/clinical";
 import { findSourceControlRules } from "@/data/sourceControl";
-import { pathogens as pathogenCatalog } from "@/data/pathogens";
 
 export const unsupportedConditions = [
   "小児",
@@ -31,28 +30,7 @@ export function getAntibiotics(ids: string[]) {
 }
 
 export function getPathogens(id: InfectionId) {
-  const prepared = pathogenProfiles[id];
-  if (prepared) return prepared;
-  const infection = infectionProfiles.find((item) => item.id === id);
-  const supplementalNames: Record<string, string> = {
-    "neisseria-meningitidis": "Neisseria meningitidis（髄膜炎菌）",
-    "listeria-monocytogenes": "Listeria monocytogenes",
-    cons: "CoNS（コアグラーゼ陰性ブドウ球菌）",
-  };
-  return (infection?.suspectedPathogenIds ?? []).map((pathogenId, index) => {
-    const pathogen = pathogenCatalog.find((item) => item.id === pathogenId);
-    return {
-      name: pathogen?.name ?? supplementalNames[pathogenId] ?? pathogenId,
-      tier: index === 0 ? "priority" as const : index === 1 ? "additional" as const : "missable" as const,
-      why: index === 0 ? "この病型で優先して評価します。" : "患者背景・感染経路・培養結果に応じて追加評価します。",
-      increasedBy: pathogen?.riskFactors.join("、") ?? "病型別背景を確認",
-      tests: pathogen?.recommendedTests.join("、") ?? "感染巣培養と感受性検査",
-      betaLactamGap: pathogenId === "listeria-monocytogenes" ? "セフェム系は無効です。" : "薬剤感受性と感染部位を確認",
-      intracellular: pathogen?.intracellular ?? false,
-      anaerobe: pathogen?.oxygenRequirement === "嫌気性",
-      resistanceRisk: pathogen?.resistanceProne ?? "菌種・施設疫学で評価",
-    };
-  });
+  return getInfectionPathogens(id);
 }
 
 export function evaluateRedFlags(redFlags: RedFlagState, infectionId: InfectionId) {
