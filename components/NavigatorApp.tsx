@@ -158,6 +158,14 @@ function ToggleButton({ label, active, onClick }: { label: string; active: boole
   );
 }
 
+function StepResetButton({ onReset }: { onReset: () => void }) {
+  return (
+    <div className="step-actions">
+      <button type="button" className="reset-button" onClick={onReset}>リセット</button>
+    </div>
+  );
+}
+
 function GuideCharacter({ message }: { message: string }) {
   return (
     <div className="guide-wrap" aria-label="診療ガイド">
@@ -282,6 +290,7 @@ export default function NavigatorApp() {
             <ToggleButton key={item} label={item} active={Boolean(redFlags[item])} onClick={() => setRedFlags(toggleRecord(redFlags, item))} />
           ))}
         </div>
+        <StepResetButton onReset={() => setRedFlags({})} />
       </section>
 
       <section className="step-block">
@@ -300,6 +309,7 @@ export default function NavigatorApp() {
           <strong>初期版の対象外</strong>
           <span>{unsupportedConditions.join(" / ")} は専門医・専門ガイドラインの確認を推奨します。</span>
         </div>
+        <StepResetButton onReset={() => setInfectionId("cap")} />
       </section>
 
       <section className="step-block">
@@ -316,6 +326,7 @@ export default function NavigatorApp() {
           <strong>{resistanceRiskLabels[result.resistance.level]}</strong>
           <p>{result.resistance.reasons.length > 0 ? result.resistance.reasons.join("、") : "明らかな耐性菌リスク項目は少ない状態です。"}</p>
         </div>
+        <StepResetButton onReset={() => setContext({ ...defaultContext })} />
       </section>
 
       <section className="step-block">
@@ -338,6 +349,7 @@ export default function NavigatorApp() {
           ))}
         </div>
         {infectionId === "cap" && <p className="micro-note">尿中肺炎球菌抗原陽性だけで肺炎球菌性肺炎と断定せず、臨床像・培養・画像と合わせて判断してください。</p>}
+        <StepResetButton onReset={() => setInfectionId("cap")} />
       </section>
 
       <section className="step-block">
@@ -366,6 +378,7 @@ export default function NavigatorApp() {
         <div className="stewardship-legend" aria-label="安全性警告レベル">
           <span className="info">情報</span><span className="warning">注意</span><span className="critical">重大</span>
         </div>
+        <StepResetButton onReset={() => setMedicationSafety(emptyMedicationSafetyInput())} />
       </section>
 
       <section className="step-block">
@@ -455,6 +468,7 @@ export default function NavigatorApp() {
           <p>培養後の狭域化候補：菌種・感受性・感染巣・臨床経過からde-escalationを検討してください。</p>
         </div>
         <AntibioticReferenceCards renal={result.renal} renalInput={renal} infectionId={infectionId} />
+        <StepResetButton onReset={() => setMeningitisPhenotypeId("community-18-49")} />
       </section>
 
       <section className="step-block">
@@ -561,6 +575,7 @@ export default function NavigatorApp() {
           })}
         </div>
         <p className="culture-note">本表示は抗菌薬用量確認を支援する参考情報です。感染部位、重症度、MIC、腎機能の推移、尿量、透析条件、採用製剤、最新添付文書、院内プロトコルを確認してください。</p>
+        <StepResetButton onReset={() => { setRenal({ ...defaultRenal }); setDoseDrugIds([]); }} />
       </section>
 
       <section className="step-block">
@@ -590,6 +605,7 @@ export default function NavigatorApp() {
         <div className="stewardship-legend" aria-label="警告レベル">
           <span className="info">情報</span><span className="warning">警告</span><span className="critical">重大警告</span>
         </div>
+        <StepResetButton onReset={() => setStewardshipCheckState({})} />
       </section>
 
       <section className="step-block">
@@ -654,6 +670,7 @@ export default function NavigatorApp() {
             <InfoBlock label="参考コメント" values={[deescalation.referenceComment]} />
           </div>
         </details>
+        <StepResetButton onReset={() => { setCultureResults(emptyCultureResults()); setCurrentTherapyIds([]); setMrsaScreenNegative(false); }} />
       </section>
 
       <section className="step-block">
@@ -662,14 +679,14 @@ export default function NavigatorApp() {
           <summary>IV→PO評価チェックリスト</summary>
           <div className="toggle-grid compact">
             {ivToPoCriteriaLabels.map(([key, label]) => (
-              <label key={key} className="toggle">
+              <label key={key} className="toggle check-row">
                 <input type="checkbox" checked={ivToPoCriteria[key]} onChange={() => setIvToPoCriteria((current) => ({ ...current, [key]: !current[key] }))} />
-                {label}
+                <span>{label}</span>
               </label>
             ))}
-            <label className="toggle">
+            <label className="toggle check-row">
               <input type="checkbox" checked={persistentBacteremia} onChange={() => setPersistentBacteremia((value) => !value)} />
-              持続菌血症
+              <span>持続菌血症</span>
             </label>
           </div>
         </details>
@@ -688,6 +705,7 @@ export default function NavigatorApp() {
             </div>
           </div>
         </details>
+        <StepResetButton onReset={() => { setIvToPoCriteria(emptyIvToPoCriteria()); setPersistentBacteremia(false); }} />
       </section>
 
       <section className="step-block">
@@ -696,9 +714,9 @@ export default function NavigatorApp() {
           <summary>共通・疾患別チェックリスト</summary>
           <div className="toggle-grid compact">
             {careBundle.map((bundleItem) => (
-              <label key={bundleItem.id} className="toggle">
+              <label key={bundleItem.id} className="toggle check-row">
                 <input type="checkbox" checked={Boolean(careBundleChecks[bundleItem.id])} onChange={() => setCareBundleChecks((current) => ({ ...current, [bundleItem.id]: !current[bundleItem.id] }))} />
-                {bundleItem.label}
+                <span>{bundleItem.label}</span>
               </label>
             ))}
           </div>
@@ -719,13 +737,14 @@ export default function NavigatorApp() {
           <summary>治療終了前チェック</summary>
           <div className="toggle-grid compact">
             {preCompletionChecklist.map((bundleItem) => (
-              <label key={bundleItem.id} className="toggle">
+              <label key={bundleItem.id} className="toggle check-row">
                 <input type="checkbox" checked={Boolean(careBundleChecks[bundleItem.id])} onChange={() => setCareBundleChecks((current) => ({ ...current, [bundleItem.id]: !current[bundleItem.id] }))} />
-                {bundleItem.label}
+                <span>{bundleItem.label}</span>
               </label>
             ))}
           </div>
         </details>
+        <StepResetButton onReset={() => { setCareBundleChecks({}); setUnexplainedFever(false); }} />
       </section>
 
       <section className="step-block">
@@ -741,6 +760,7 @@ export default function NavigatorApp() {
             <p>{result.sourceControlResult.actions.join(" / ") || "外科、泌尿器科、耳鼻科、整形外科、放射線科への相談を検討してください。"}</p>
           </div>
         )}
+        <StepResetButton onReset={() => setSourceControl({})} />
       </section>
 
       <section className="step-block">
@@ -758,6 +778,7 @@ export default function NavigatorApp() {
           <p>静注から内服への切替は、症状改善、循環動態安定、経口摂取可能、嘔吐・重度下痢・吸収障害なし、解熱と炎症反応改善傾向を確認して検討します。</p>
           <p>感染性心内膜炎、中枢神経感染症、S. aureus菌血症、壊死性軟部組織感染症、未ドレナージ膿瘍、人工物感染、重症免疫抑制、深部感染では安易な内服切替を勧めません。</p>
         </div>
+        <StepResetButton onReset={() => setReassessment({ ...defaultReassessment })} />
       </section>
 
       <section className="step-block summary-block">
@@ -779,6 +800,7 @@ export default function NavigatorApp() {
           <SummaryItem label="出典" value={[...result.infection.reference, "PMDA電子添文", "抗菌薬TDM臨床実践ガイドライン", "KDIGO 2024 CKD Guideline", "IDSA耐性菌ガイダンス"].join(" / ")} />
         </div>
         <p className="safety-note final">本ツールは診断・処方を自動確定するものではありません。患者の臨床状態、培養結果、施設アンチバイオグラム、院内プロトコル、最新の添付文書・ガイドラインを確認し、最終判断は担当医が行ってください。</p>
+        <StepResetButton onReset={() => setSeverity("中等症候補")} />
       </section>
     </main>
   );

@@ -34,6 +34,8 @@
 
 html {
   min-height: 100%;
+  width: 100%;
+  overflow-x: hidden;
   background: var(--background);
 }
 
@@ -250,9 +252,12 @@ h1 {
 
 .step-block {
   position: relative;
+  width: 100%;
+  min-width: auto;
   margin-top: 54px;
   padding-top: 28px;
   border-top: 1px solid var(--line);
+  overflow-x: hidden;
 }
 
 .step-heading {
@@ -286,6 +291,8 @@ h1 {
 
 .toggle {
   width: 100%;
+  min-width: auto;
+  box-sizing: border-box;
   border: 1px solid rgba(159, 182, 200, 0.25);
   border-radius: 8px;
   padding: 11px 12px;
@@ -564,6 +571,68 @@ dd {
   padding-top: 16px;
 }
 
+.check-row,
+.stewardship-check {
+  display: flex;
+  flex-flow: row nowrap;
+  align-items: flex-start;
+  width: 100%;
+  min-width: auto;
+  box-sizing: border-box;
+}
+
+.check-row input[type="checkbox"],
+.stewardship-check input[type="checkbox"] {
+  flex: 0 0 1rem;
+  width: 1rem;
+  min-width: 1rem;
+  height: 1rem;
+  min-height: 1rem;
+  margin: 0.2rem 0 0;
+  padding: 0;
+}
+
+.check-row {
+  gap: 9px;
+  white-space: normal;
+  overflow-wrap: anywhere;
+  word-break: normal;
+}
+
+.check-row > span,
+.stewardship-check > span {
+  flex: 1 1 auto;
+  min-width: 0;
+  white-space: normal;
+  overflow-wrap: anywhere;
+  word-break: normal;
+}
+
+.step-actions {
+  display: flex;
+  position: static;
+  width: 100%;
+  margin-top: 20px;
+  justify-content: flex-end;
+}
+
+.reset-button {
+  position: static;
+  width: min(100%, 180px);
+  border: 1px solid rgba(53, 215, 255, 0.55);
+  border-radius: 8px;
+  padding: 10px 16px;
+  background: rgba(53, 215, 255, 0.1);
+  color: #e8f7ff;
+  font-weight: 800;
+}
+
+.reset-button:hover,
+.reset-button:focus-visible {
+  border-color: var(--cyan);
+  background: rgba(53, 215, 255, 0.2);
+}
+
 .drug-card > summary,
 .reasoning-accordion > summary {
   cursor: pointer;
@@ -627,8 +696,9 @@ dd {
 .stewardship-check-list,
 .stewardship-drug-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(min(240px, 100%), 1fr));
   gap: 10px;
+  width: 100%;
   min-width: 0;
 }
 
@@ -649,8 +719,7 @@ dd {
 }
 
 .stewardship-check input {
-  flex: 0 0 auto;
-  margin-top: 0.28rem;
+  flex: 0 0 1rem;
 }
 
 .stewardship-check.info,
@@ -711,8 +780,9 @@ dd {
 
 .medication-safety-results {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(min(250px, 100%), 1fr));
   gap: 10px;
+  width: 100%;
   min-width: 0;
 }
 
@@ -767,6 +837,8 @@ dd {
 }
 
 .evidence-accordion {
+  width: 100%;
+  min-width: auto;
   margin-top: 12px;
   border: 1px solid rgba(85, 201, 255, 0.3);
   border-radius: 12px;
@@ -796,9 +868,10 @@ dd {
 
 .evidence-card {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(min(220px, 100%), 1fr));
   gap: 10px;
   padding: 0 12px 12px;
+  width: 100%;
   min-width: 0;
 }
 
@@ -980,6 +1053,13 @@ dd {
 }
 
 @media (max-width: 760px) {
+  .app-shell {
+    width: 100%;
+    padding-right: max(12px, env(safe-area-inset-right));
+    padding-left: max(12px, env(safe-area-inset-left));
+    overflow-x: hidden;
+  }
+
   .hero {
     grid-template-columns: 1fr;
     min-height: auto;
@@ -1056,6 +1136,44 @@ dd {
   .summary-grid,
   .renal-results {
     grid-template-columns: 1fr;
+  }
+
+  .stewardship-check-list,
+  .stewardship-drug-grid,
+  .medication-safety-results,
+  .evidence-card {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .reasoning-accordion,
+  .reasoning-accordion > div,
+  .evidence-accordion,
+  .medication-safety-alert,
+  .stewardship-drug-card,
+  .alert-panel,
+  .rules-panel,
+  .result-strip {
+    width: 100%;
+    max-width: 100%;
+    min-width: auto;
+    box-sizing: border-box;
+    overflow-wrap: anywhere;
+  }
+
+  .reasoning-accordion > summary,
+  .evidence-accordion > summary {
+    width: 100%;
+    min-width: 0;
+    white-space: normal;
+    overflow-wrap: anywhere;
+  }
+
+  .step-actions {
+    justify-content: stretch;
+  }
+
+  .reset-button {
+    width: 100%;
   }
 
   .administration-flow,
