@@ -16,6 +16,7 @@ import { getAdministrationInstructions } from "@/lib/getAdministrationInstructio
 import { getRenalDoseRecommendation } from "@/lib/getRenalDoseRecommendation";
 import type { AntibioticReasoning } from "@/types/antibiotics";
 import type { InfectionId, PatientContext, RenalInput } from "@/types/clinical";
+import { assessDeescalation, cultureOrganisms, cultureSites, emptyCultureResults, susceptibilityDrugs, type CultureResults, type CultureStatus, type Susceptibility } from "@/data/deescalation";
 
 const redFlagItems = [
   "収縮期血圧低下",
@@ -174,6 +175,9 @@ export default function NavigatorApp() {
   const [severity, setSeverity] = useState("中等症候補");
   const [doseDrugIds, setDoseDrugIds] = useState<string[]>([]);
   const [meningitisPhenotypeId, setMeningitisPhenotypeId] = useState<MeningitisPhenotypeId>("community-18-49");
+  const [cultureResults, setCultureResults] = useState<CultureResults>(() => emptyCultureResults());
+  const [currentTherapyIds, setCurrentTherapyIds] = useState<string[]>([]);
+  const [mrsaScreenNegative, setMrsaScreenNegative] = useState(false);
 
   const result = useMemo(
     () => buildRecommendation({ infectionId, context, redFlags, sourceControl, renalInput: renal, reassessment }),
@@ -199,6 +203,10 @@ export default function NavigatorApp() {
   const visibleDoseCandidates = infectionId === "bacterialMeningitis"
     ? doseCandidates.filter((drug) => meningitisPhenotype.candidateDrugIds.includes(drug.id))
     : doseCandidates;
+  const deescalation = useMemo(
+    () => assessDeescalation({ currentDrugs: currentTherapyIds, cultures: cultureResults, mrsaScreenNegative }),
+    [currentTherapyIds, cultureResults, mrsaScreenNegative],
+  );
 
   return (
     <main className="app-shell">
@@ -492,7 +500,71 @@ export default function NavigatorApp() {
       </section>
 
       <section className="step-block">
-        <StepHeading step="Step 6" title="感染源コントロール" lead="抗菌薬の広域化だけでは改善しない条件を確認します。" />
+        <StepHeading step="Step 6" title="培養・感受性結果" lead="培養と感受性から、経験的治療の狭域化を検討します。" />
+        <details className="reasoning-accordion" open>
+          <summary>培養・感受性結果を入力</summary>
+          <div>
+            <h3>現在薬</h3>
+            <div className="toggle-grid compact">
+              {antibiotics.map((drug) => <ToggleButton key={drug.id} label={drug.genericName} active={currentTherapyIds.includes(drug.id)} onClick={() => setCurrentTherapyIds((current) => current.includes(drug.id) ? current.filter((id) => id !== drug.id) : [...current, drug.id])} />)}
+            </div>
+            <div className="toggle-grid compact">
+              <ToggleButton label="MRSAスクリーニング陰性" active={mrsaScreenNegative} onClick={() => setMrsaScreenNegative((value) => !value)} />
+            </div>
+            <div className="culture-result-grid">
+              {cultureSites.map((site) => {
+                const culture = cultureResults[site.id];
+                return (
+                  <article key={site.id} className="candidate-column">
+                    <h3>{site.label}</h3>
+                    <label>結果
+                      <select value={culture.status} onChange={(event) => {
+                        const status = event.target.value as CultureStatus;
+                        setCultureResults((current) => ({ ...current, [site.id]: { status, organism: status === "positive" ? current[site.id].organism ?? "MSSA" : undefined, susceptibilities: status === "positive" ? current[site.id].susceptibilities : {} } }));
+                      }}>
+                        <option value="not-submitted">未提出</option><option value="negative">陰性</option><option value="positive">陽性</option>
+                      </select>
+                    </label>
+                    {culture.status === "positive" && (
+                      <>
+                        <label>菌種
+                          <select value={culture.organism} onChange={(event) => setCultureResults((current) => ({ ...current, [site.id]: { ...current[site.id], organism: event.target.value as (typeof cultureOrganisms)[number] } }))}>
+                            {cultureOrganisms.map((organism) => <option key={organism} value={organism}>{organism}</option>)}
+                          </select>
+                        </label>
+                        <div className="drug-grid">
+                          {susceptibilityDrugs.map((drug) => (
+                            <label key={drug.id}>{drug.label}
+                              <select value={culture.susceptibilities[drug.id] ?? "unknown"} onChange={(event) => setCultureResults((current) => ({ ...current, [site.id]: { ...current[site.id], susceptibilities: { ...current[site.id].susceptibilities, [drug.id]: event.target.value as Susceptibility } } }))}>
+                                <option value="unknown">未確認</option><option value="S">S</option><option value="I">I</option><option value="R">R</option>
+                              </select>
+                            </label>
+                          ))}
+                        </div>
+                      </>
+                    )}
+                  </article>
+                );
+              })}
+            </div>
+          </div>
+        </details>
+        <details className="reasoning-accordion" open>
+          <summary>De-escalation候補</summary>
+          <div className="dose-guidance-grid">
+            <InfoBlock label="変更候補" values={[deescalation.headline]} />
+            <InfoBlock label="理由" values={deescalation.reasons} />
+            <InfoBlock label="現在薬" values={deescalation.currentDrugs.map((id) => antibiotics.find((drug) => drug.id === id)?.genericName ?? id).length ? deescalation.currentDrugs.map((id) => antibiotics.find((drug) => drug.id === id)?.genericName ?? id) : ["未選択"]} />
+            <InfoBlock label="推奨薬" values={deescalation.recommendedDrugs.length ? deescalation.recommendedDrugs.map((id) => antibiotics.find((drug) => drug.id === id)?.genericName ?? id) : ["自動提案なし"]} />
+            <InfoBlock label="Coverage比較" values={[deescalation.coverageComparison]} />
+            <InfoBlock label="注意点" values={deescalation.cautions} />
+            <InfoBlock label="参考コメント" values={[deescalation.referenceComment]} />
+          </div>
+        </details>
+      </section>
+
+      <section className="step-block">
+        <StepHeading step="Step 7" title="感染源コントロール" lead="抗菌薬の広域化だけでは改善しない条件を確認します。" />
         <div className="toggle-grid">
           {sourceControlItems.map((item) => (
             <ToggleButton key={item} label={item} active={Boolean(sourceControl[item])} onClick={() => setSourceControl(toggleRecord(sourceControl, item))} />
@@ -507,7 +579,7 @@ export default function NavigatorApp() {
       </section>
 
       <section className="step-block">
-        <StepHeading step="Step 7" title="48-72時間後の再評価" lead="反応不良時は診断、感染源、投与設計、組織移行性を順番に見直します。" />
+        <StepHeading step="Step 8" title="48-72時間後の再評価" lead="反応不良時は診断、感染源、投与設計、組織移行性を順番に見直します。" />
         <GuideCharacter message={guideMessages.step7} />
         <div className="rules-panel"><ol>{result.infection.reassessmentPoints.map((item) => <li key={item}>{item}</li>)}</ol></div>
         <div className="toggle-grid">
@@ -524,7 +596,7 @@ export default function NavigatorApp() {
       </section>
 
       <section className="step-block summary-block">
-        <StepHeading step="Step 8" title="診療サマリー" lead="診断・処方の確定ではなく、確認事項を一画面に集約します。" />
+        <StepHeading step="Step 9" title="診療サマリー" lead="診断・処方の確定ではなく、確認事項を一画面に集約します。" />
         <div className="summary-grid">
           <SummaryItem label="感染臓器" value={result.infection.label} />
           <SummaryItem label="重症度" value={severity} onChange={setSeverity} />

@@ -15,6 +15,7 @@ import { evidenceAntibioticDoses } from "../data/antibioticDosing.ts";
 import { getMeningitisPhenotype } from "../data/meningitisDosing.ts";
 import { sourceControlRules } from "../data/sourceControl.ts";
 import { regimenGuidance } from "../data/regimenGuidance.ts";
+import { assessDeescalation, deescalationWarnings, emptyCultureResults } from "../data/deescalation.ts";
 
 const baseContext = {
   healthcareAssociated: false,
@@ -312,6 +313,79 @@ test("嫌気性菌必須疾患でCTRX単独を第一選択にしない", () => {
     const standards = getCoverageDrivenRegimens(id, baseContext).filter((item) => item.category === "standard");
     assert.ok(!standards.some((item) => item.drugIds.length === 1 && item.drugIds[0] === "ceftriaxone"), id);
   }
+});
+
+function deescalationFor({ currentDrugs, entries = [], mrsaScreenNegative = false }) {
+  const cultures = emptyCultureResults();
+  for (const [site, organism, susceptibilities = {}] of entries) cultures[site] = { status: "positive", organism, susceptibilities };
+  return assessDeescalation({ currentDrugs, cultures, mrsaScreenNegative });
+}
+
+for (const [title, currentDrug, organism, susceptibilityDrug, expectedDrug] of [
+  ["MEPMからE.coli感受性時にCTRX候補", "meropenem", "Escherichia coli", "ceftriaxone", "ceftriaxone"],
+  ["MEPMからKlebsiella感受性時にCTRX候補", "meropenem", "Klebsiella pneumoniae", "ceftriaxone", "ceftriaxone"],
+  ["MEPMからProteus感受性時にCTRX候補", "meropenem", "Proteus mirabilis", "ceftriaxone", "ceftriaxone"],
+  ["PIPC/TAZからE.coli感受性時にABPC/SBT候補", "piperacillinTazobactam", "Escherichia coli", "ampicillinSulbactam", "ampicillinSulbactam"],
+  ["PIPC/TAZからKlebsiella感受性時にABPC/SBT候補", "piperacillinTazobactam", "Klebsiella pneumoniae", "ampicillinSulbactam", "ampicillinSulbactam"],
+  ["PIPC/TAZからProteus感受性時にABPC/SBT候補", "piperacillinTazobactam", "Proteus mirabilis", "ampicillinSulbactam", "ampicillinSulbactam"],
+]) {
+  test(title, () => {
+    const result = deescalationFor({ currentDrugs: [currentDrug], entries: [["blood", organism, { [susceptibilityDrug]: "S" }]] });
+    assert.equal(result.action, "consider-change");
+    assert.ok(result.recommendedDrugs.includes(expectedDrug));
+  });
+}
+
+test("VCMからMSSA同定時にCEZ候補", () => {
+  const result = deescalationFor({ currentDrugs: ["vancomycin"], entries: [["blood", "MSSA"]] });
+  assert.deepEqual(result.recommendedDrugs, ["cefazolin"]);
+});
+
+test("VCM使用中でMRSA陰性なら継続必要性を再評価", () => {
+  const result = deescalationFor({ currentDrugs: ["vancomycin"], entries: [["sputum", "Streptococcus pneumoniae"]], mrsaScreenNegative: true });
+  assert.equal(result.action, "reassess");
+  assert.match(result.headline, /VCM継続/);
+});
+
+test("複数菌感染では変更提案しない", () => {
+  const result = deescalationFor({ currentDrugs: ["meropenem"], entries: [["blood", "Escherichia coli", { ceftriaxone: "S" }], ["pus", "Bacteroides fragilis"]] });
+  assert.equal(result.action, "no-automatic-change");
+  assert.equal(result.recommendedDrugs.length, 0);
+});
+
+test("陰性培養では経験的治療継続要否を再評価", () => {
+  const cultures = emptyCultureResults(); cultures.blood.status = "negative";
+  assert.equal(assessDeescalation({ currentDrugs: ["ceftriaxone"], cultures, mrsaScreenNegative: false }).action, "continue-empiric");
+});
+
+test("未提出培養では経験的治療継続要否を再評価", () => {
+  assert.equal(assessDeescalation({ currentDrugs: ["ceftriaxone"], cultures: emptyCultureResults(), mrsaScreenNegative: false }).action, "continue-empiric");
+});
+
+test("CTRXがRならMEPMからCTRXを提案しない", () => {
+  const result = deescalationFor({ currentDrugs: ["meropenem"], entries: [["blood", "Escherichia coli", { ceftriaxone: "R" }]] });
+  assert.equal(result.action, "no-automatic-change");
+});
+
+test("ABPC/SBTがIならPIPC/TAZから変更提案しない", () => {
+  const result = deescalationFor({ currentDrugs: ["piperacillinTazobactam"], entries: [["bile", "Escherichia coli", { ampicillinSulbactam: "I" }]] });
+  assert.equal(result.action, "no-automatic-change");
+});
+
+test("MRSA同定時はVCM中止を自動提案しない", () => {
+  const result = deescalationFor({ currentDrugs: ["vancomycin"], entries: [["blood", "MRSA", { vancomycin: "S" }]], mrsaScreenNegative: false });
+  assert.equal(result.action, "no-automatic-change");
+});
+
+test("Candida同定時は抗菌薬の自動狭域化を提案しない", () => {
+  const result = deescalationFor({ currentDrugs: ["meropenem"], entries: [["blood", "Candida spp."]] });
+  assert.equal(result.action, "no-automatic-change");
+});
+
+test("De-escalation提案は指定された4警告を常に表示する", () => {
+  const result = deescalationFor({ currentDrugs: ["vancomycin"], entries: [["blood", "MSSA"]] });
+  assert.equal(deescalationWarnings.length, 4);
+  for (const warning of deescalationWarnings) assert.ok(result.cautions.includes(warning));
 });
 
 test("監査対象では軽症にMEPMを第一選択表示しない", () => {
