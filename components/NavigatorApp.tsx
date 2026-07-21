@@ -18,6 +18,8 @@ import type { AntibioticReasoning } from "@/types/antibiotics";
 import type { InfectionId, PatientContext, RenalInput } from "@/types/clinical";
 import { assessDeescalation, cultureOrganisms, cultureSites, emptyCultureResults, susceptibilityDrugs, type CultureResults, type CultureStatus, type Susceptibility } from "@/data/deescalation";
 import { careBundleFor, preCompletionChecklist, specialistConsultReasons } from "@/data/careBundles";
+import { commonStewardshipChecks, stewardshipChecksForDrugIds } from "@/data/stewardshipChecks";
+import { emptyMedicationSafetyInput, evaluateMedicationSafety, medicationSafetyInputLabels, type MedicationSafetyInput } from "@/data/medicationSafety";
 
 const redFlagItems = [
   "収縮期血圧低下",
@@ -181,6 +183,8 @@ export default function NavigatorApp() {
   const [mrsaScreenNegative, setMrsaScreenNegative] = useState(false);
   const [careBundleChecks, setCareBundleChecks] = useState<Record<string, boolean>>({});
   const [unexplainedFever, setUnexplainedFever] = useState(false);
+  const [stewardshipCheckState, setStewardshipCheckState] = useState<Record<string, boolean>>({});
+  const [medicationSafety, setMedicationSafety] = useState<MedicationSafetyInput>(() => emptyMedicationSafetyInput());
 
   const result = useMemo(
     () => buildRecommendation({ infectionId, context, redFlags, sourceControl, renalInput: renal, reassessment }),
@@ -218,6 +222,15 @@ export default function NavigatorApp() {
     resistantOrganism: context.mrsaHistory || context.esblHistory || context.ampCHistory || context.creHistory || context.pseudomonasHistory,
     candida: Object.values(cultureResults).some((culture) => culture.status === "positive" && culture.organism === "Candida spp."),
     unexplainedFever,
+  });
+  const stewardshipDrugGroups = stewardshipChecksForDrugIds(visibleDoseCandidates.map((drug) => drug.id));
+  const safetyAlerts = evaluateMedicationSafety(visibleDoseCandidates.map((drug) => drug.id), {
+    ...medicationSafety,
+    aki: renal.aki,
+    severeRenalImpairment: result.renal.category === "severe" || result.renal.category === "kidneyFailure",
+    hemodialysis: medicationSafety.hemodialysis || renal.hemodialysis,
+    peritonealDialysis: medicationSafety.peritonealDialysis || renal.peritonealDialysis,
+    crrt: medicationSafety.crrt || renal.crrt,
   });
 
   return (
@@ -317,7 +330,35 @@ export default function NavigatorApp() {
       </section>
 
       <section className="step-block">
-        <StepHeading step="Step 4" title="経験的抗菌薬候補" lead="培養採取、追加カバー条件、狭域化条件を同じ画面で確認します。" />
+        <StepHeading step="Step 4" title="Medication Safety Check" lead="推奨抗菌薬を確認する前に、患者背景・併用薬・臓器機能の安全性条件を確認します。" />
+        <details className="reasoning-accordion" open>
+          <summary>患者背景・併用薬を入力</summary>
+          <div className="toggle-grid compact">
+            {medicationSafetyInputLabels.map(([key, label]) => (
+              <ToggleButton key={key} label={label} active={medicationSafety[key]} onClick={() => setMedicationSafety((current) => ({ ...current, [key]: !current[key] }))} />
+            ))}
+          </div>
+        </details>
+        <details className="reasoning-accordion" open>
+          <summary>安全性評価</summary>
+          <div className="medication-safety-results" aria-live="polite">
+            {safetyAlerts.length > 0 ? safetyAlerts.map((safetyAlert) => (
+              <article key={safetyAlert.id} className={`medication-safety-alert ${safetyAlert.severity}`}>
+                <span>{safetyAlert.severity === "critical" ? "重大" : safetyAlert.severity === "warning" ? "注意" : "情報"}</span>
+                <h3>{safetyAlert.title}</h3>
+                <p>{safetyAlert.message}</p>
+                {safetyAlert.alternative && <strong>代替薬候補：{safetyAlert.alternative}</strong>}
+              </article>
+            )) : <p className="micro-note">選択中の条件では重大な安全性シグナルは検出されていません。患者情報と最新資料の再確認を推奨します。</p>}
+          </div>
+        </details>
+        <div className="stewardship-legend" aria-label="安全性警告レベル">
+          <span className="info">情報</span><span className="warning">注意</span><span className="critical">重大</span>
+        </div>
+      </section>
+
+      <section className="step-block">
+        <StepHeading step="Step 5" title="経験的抗菌薬候補" lead="培養採取、追加カバー条件、狭域化条件を同じ画面で確認します。" />
         <GuideCharacter message={guideMessages.step4} />
         {infectionId === "bacterialMeningitis" && (
           <div className="rules-panel">
@@ -406,7 +447,7 @@ export default function NavigatorApp() {
       </section>
 
       <section className="step-block">
-        <StepHeading step="Step 5" title="腎機能・投与量確認" lead="BMI、日本人eGFR、Cockcroft-Gault推算CrClを分けて確認します。" />
+        <StepHeading step="Step 6" title="腎機能・投与量確認" lead="BMI、日本人eGFR、Cockcroft-Gault推算CrClを分けて確認します。" />
         <GuideCharacter message={guideMessages.step5} />
         <div className="renal-grid">
           <NumberInput label="年齢" value={renal.age} onChange={(age) => setRenal({ ...renal, age })} />
@@ -512,7 +553,36 @@ export default function NavigatorApp() {
       </section>
 
       <section className="step-block">
-        <StepHeading step="Step 6" title="培養・感受性結果" lead="培養と感受性から、経験的治療の狭域化を検討します。" />
+        <StepHeading step="Step 7" title="Antimicrobial Stewardship Check" lead="開始前に適応・安全性・適正使用を再確認します。" />
+        <details className="reasoning-accordion" open>
+          <summary>開始前・治療中チェックリスト</summary>
+          <div className="stewardship-check-list">
+            {commonStewardshipChecks.map((check) => (
+              <label key={check.id} className={`stewardship-check ${check.severity}`}>
+                <input type="checkbox" checked={Boolean(stewardshipCheckState[check.id])} onChange={() => setStewardshipCheckState((current) => ({ ...current, [check.id]: !current[check.id] }))} />
+                <span>{check.label}</span>
+              </label>
+            ))}
+          </div>
+        </details>
+        <details className="reasoning-accordion" open>
+          <summary>候補薬ごとの追加確認</summary>
+          <div className="stewardship-drug-grid">
+            {stewardshipDrugGroups.length > 0 ? stewardshipDrugGroups.map(({ drugId, checks }) => (
+              <article key={drugId} className="stewardship-drug-card">
+                <h3>{antibiotics.find((drug) => drug.id === drugId)?.genericName ?? drugId}</h3>
+                {checks.map((check) => <p key={check.id} className={`stewardship-alert ${check.severity}`}>{check.label}</p>)}
+              </article>
+            )) : <p className="micro-note">現在の候補薬に固有のAST追加確認項目はありません。</p>}
+          </div>
+        </details>
+        <div className="stewardship-legend" aria-label="警告レベル">
+          <span className="info">情報</span><span className="warning">警告</span><span className="critical">重大警告</span>
+        </div>
+      </section>
+
+      <section className="step-block">
+        <StepHeading step="Step 8" title="培養・感受性結果" lead="培養と感受性から、経験的治療の狭域化を検討します。" />
         <details className="reasoning-accordion" open>
           <summary>培養・感受性結果を入力</summary>
           <div>
@@ -576,7 +646,7 @@ export default function NavigatorApp() {
       </section>
 
       <section className="step-block">
-        <StepHeading step="Step 7" title="Clinical Care Bundle" lead="抗菌薬選択後に必要な評価・培養・感染源コントロールをチェックします。" />
+        <StepHeading step="Step 9" title="Clinical Care Bundle" lead="抗菌薬選択後に必要な評価・培養・感染源コントロールをチェックします。" />
         <details className="reasoning-accordion" open>
           <summary>共通・疾患別チェックリスト</summary>
           <div className="toggle-grid compact">
@@ -614,7 +684,7 @@ export default function NavigatorApp() {
       </section>
 
       <section className="step-block">
-        <StepHeading step="Step 8" title="感染源コントロール" lead="抗菌薬の広域化だけでは改善しない条件を確認します。" />
+        <StepHeading step="Step 10" title="感染源コントロール" lead="抗菌薬の広域化だけでは改善しない条件を確認します。" />
         <div className="toggle-grid">
           {sourceControlItems.map((item) => (
             <ToggleButton key={item} label={item} active={Boolean(sourceControl[item])} onClick={() => setSourceControl(toggleRecord(sourceControl, item))} />
@@ -629,7 +699,7 @@ export default function NavigatorApp() {
       </section>
 
       <section className="step-block">
-        <StepHeading step="Step 9" title="48-72時間後の再評価" lead="反応不良時は診断、感染源、投与設計、組織移行性を順番に見直します。" />
+        <StepHeading step="Step 11" title="48-72時間後の再評価" lead="反応不良時は診断、感染源、投与設計、組織移行性を順番に見直します。" />
         <GuideCharacter message={guideMessages.step7} />
         <div className="rules-panel"><ol>{result.infection.reassessmentPoints.map((item) => <li key={item}>{item}</li>)}</ol></div>
         <div className="toggle-grid">
@@ -646,7 +716,7 @@ export default function NavigatorApp() {
       </section>
 
       <section className="step-block summary-block">
-        <StepHeading step="Step 10" title="診療サマリー" lead="診断・処方の確定ではなく、確認事項を一画面に集約します。" />
+        <StepHeading step="Step 12" title="診療サマリー" lead="診断・処方の確定ではなく、確認事項を一画面に集約します。" />
         <div className="summary-grid">
           <SummaryItem label="感染臓器" value={result.infection.label} />
           <SummaryItem label="重症度" value={severity} onChange={setSeverity} />

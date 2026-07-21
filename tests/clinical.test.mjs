@@ -17,6 +17,8 @@ import { sourceControlRules } from "../data/sourceControl.ts";
 import { regimenGuidance } from "../data/regimenGuidance.ts";
 import { assessDeescalation, deescalationWarnings, emptyCultureResults } from "../data/deescalation.ts";
 import { careBundleFor, commonCareBundle, diseaseCareBundles, preCompletionChecklist, specialistConsultConditions, specialistConsultReasons } from "../data/careBundles.ts";
+import { commonStewardshipChecks, drugStewardshipChecks, stewardshipChecksForDrugIds } from "../data/stewardshipChecks.ts";
+import { emptyMedicationSafetyInput, evaluateMedicationSafety, medicationSafetyInputLabels } from "../data/medicationSafety.ts";
 
 const baseContext = {
   healthcareAssociated: false,
@@ -441,6 +443,86 @@ test("治療終了前チェックを6件表示する", () => {
 test("Care Bundleは処置を断定せず検討・評価・確認表現を使用する", () => {
   const all = [...commonCareBundle, ...Object.values(diseaseCareBundles).flat(), ...preCompletionChecklist];
   for (const bundleItem of all) assert.match(bundleItem.label, /検討|考慮|評価|確認|遅らせない/);
+});
+
+test("AST共通チェックは指定された15項目を保持する", () => {
+  assert.equal(commonStewardshipChecks.length, 15);
+  const labels = commonStewardshipChecks.map((check) => check.label).join("、");
+  for (const term of ["感染症診断", "培養採取", "感染源コントロール", "βラクタム", "90日", "ESBL", "MRSA", "緑膿菌", "腎機能", "肝機能", "妊娠・授乳", "相互作用", "C. difficile", "De-escalation", "治療期間"]) assert.ok(labels.includes(term), term);
+});
+
+for (const [drugId, expectedTerms] of [
+  ["vancomycin", ["TDM", "腎障害", "腎毒性薬"]],
+  ["piperacillinTazobactam", ["ナトリウム", "広域薬"]],
+  ["meropenem", ["ESBL", "カルバペネム"]],
+  ["cefepime", ["神経毒性", "腎機能"]],
+  ["ampicillin", ["EBV", "発疹"]],
+  ["levofloxacin", ["QT延長", "腱障害", "大動脈"]],
+]) {
+  test(`${drugId}のAST固有チェックを表示する`, () => {
+    const labels = drugStewardshipChecks[drugId].map((check) => check.label).join("、");
+    for (const term of expectedTerms) assert.ok(labels.includes(term), term);
+  });
+}
+
+test("AST薬剤チェックは候補薬だけを重複なく返す", () => {
+  const groups = stewardshipChecksForDrugIds(["vancomycin", "cefazolin", "vancomycin", "meropenem"]);
+  assert.deepEqual(groups.map((group) => group.drugId), ["vancomycin", "meropenem"]);
+});
+
+test("ASTチェックは情報・警告・重大警告の3段階を使用する", () => {
+  const severities = new Set([...commonStewardshipChecks, ...Object.values(drugStewardshipChecks).flat()].map((check) => check.severity));
+  assert.deepEqual([...severities].sort(), ["critical", "info", "warning"]);
+});
+
+const safetyInput = (overrides = {}) => ({ ...emptyMedicationSafetyInput(), ...overrides });
+const findSafety = (drugIds, overrides, id) => evaluateMedicationSafety(drugIds, safetyInput(overrides)).find((entry) => entry.id === id);
+
+test("Medication Safety入力は指定項目と飲酒・CDIリスクを保持する", () => {
+  assert.equal(medicationSafetyInputLabels.length, 18);
+  const labels = medicationSafetyInputLabels.map(([, label]) => label).join("、");
+  for (const term of ["βラクタム", "アナフィラキシー", "妊娠", "授乳", "G6PD", "QT", "てんかん", "肝障害", "血液透析", "腹膜透析", "CRRT", "バルプロ酸", "ワルファリン", "DOAC", "タクロリムス", "シクロスポリン", "飲酒", "C. difficile"]) assert.ok(labels.includes(term), term);
+});
+
+for (const [name, drugIds, input, alertId, severity, alternative] of [
+  ["MEPM＋バルプロ酸", ["meropenem"], { valproate: true }, "mepm-valproate", "critical", true],
+  ["LVFX＋QT延長", ["levofloxacin"], { qtProlongation: true }, "lvfx-qt", "critical", true],
+  ["CFPM＋重症腎障害", ["cefepime"], { severeRenalImpairment: true }, "cfpm-neurotoxicity", "critical", true],
+  ["VCM＋AKI", ["vancomycin"], { aki: true }, "vcm-renal", "critical", true],
+  ["MNZ＋ワルファリン", ["metronidazole"], { warfarin: true }, "mnz-warfarin", "critical", true],
+  ["CLDM＋CDIリスク", ["clindamycin"], { cDiffRisk: true }, "cldm-cdiff", "critical", true],
+  ["βラクタムアレルギー", ["ampicillin"], { betaLactamAllergy: true }, "beta-allergy-ampicillin", "warning", true],
+  ["ペニシリンアナフィラキシー＋セフェム", ["ceftriaxone"], { penicillinAnaphylaxis: true }, "anaphylaxis-ceftriaxone", "critical", true],
+  ["妊娠", ["cefazolin"], { pregnancy: true }, "pregnancy", "warning", false],
+  ["血液透析", ["cefazolin"], { hemodialysis: true }, "rrt", "critical", true],
+  ["腹膜透析", ["cefazolin"], { peritonealDialysis: true }, "rrt", "critical", true],
+  ["CRRT", ["cefazolin"], { crrt: true }, "rrt", "critical", true],
+  ["MEPM＋てんかん", ["meropenem"], { epilepsy: true }, "mepm-seizure", "warning", true],
+  ["VCM＋タクロリムス", ["vancomycin"], { tacrolimus: true }, "vcm-nephrotoxic", "critical", true],
+  ["VCM＋シクロスポリン", ["vancomycin"], { cyclosporine: true }, "vcm-nephrotoxic", "critical", true],
+  ["LVFX＋ワルファリン", ["levofloxacin"], { warfarin: true }, "lvfx-warfarin", "critical", true],
+  ["MNZ＋飲酒", ["metronidazole"], { alcoholUse: true }, "mnz-alcohol", "warning", false],
+]) {
+  test(`${name}のSafety Ruleを表示する`, () => {
+    const result = findSafety(drugIds, input, alertId);
+    assert.ok(result, alertId);
+    assert.equal(result.severity, severity);
+    assert.equal(Boolean(result.alternative), alternative);
+  });
+}
+
+test("VCMはTDM情報を常に表示する", () => assert.equal(findSafety(["vancomycin"], {}, "vcm-tdm")?.severity, "info"));
+test("PIPC/TAZはNa負荷注意を表示する", () => assert.equal(findSafety(["piperacillinTazobactam"], {}, "piptaz-sodium")?.severity, "warning"));
+test("ABPCはEBV発疹情報を表示する", () => assert.equal(findSafety(["ampicillin"], {}, "abpc-ebv")?.severity, "info"));
+test("LVFXは腱障害注意を表示する", () => assert.equal(findSafety(["levofloxacin"], {}, "lvfx-tendon")?.severity, "warning"));
+test("LVFXは大動脈疾患注意を表示する", () => assert.equal(findSafety(["levofloxacin"], {}, "lvfx-aorta")?.severity, "warning"));
+test("MNZは末梢神経障害情報を表示する", () => assert.equal(findSafety(["metronidazole"], {}, "mnz-neuropathy")?.severity, "info"));
+test("DOAC内服は相互作用再確認を表示する", () => assert.equal(findSafety([], { doac: true }, "doac")?.interaction, true));
+test("授乳は乳汁移行の再確認を表示する", () => assert.equal(findSafety([], { breastfeeding: true }, "breastfeeding")?.severity, "info"));
+test("重症肝障害は用量調整再確認を表示する", () => assert.equal(findSafety([], { severeLiverDisease: true }, "liver")?.severity, "warning"));
+test("安全性メッセージは処方禁止と断定しない", () => {
+  const alerts = evaluateMedicationSafety(["vancomycin", "meropenem", "cefepime", "piperacillinTazobactam", "ampicillin", "levofloxacin", "clindamycin", "metronidazole"], safetyInput({ betaLactamAllergy: true, penicillinAnaphylaxis: true, pregnancy: true, breastfeeding: true, g6pdDeficiency: true, qtProlongation: true, epilepsy: true, severeLiverDisease: true, hemodialysis: true, valproate: true, warfarin: true, doac: true, tacrolimus: true, alcoholUse: true, cDiffRisk: true, aki: true }));
+  for (const entry of alerts) assert.doesNotMatch(`${entry.message} ${entry.alternative ?? ""}`, /処方禁止|投与禁止/);
 });
 
 test("監査対象では軽症にMEPMを第一選択表示しない", () => {
