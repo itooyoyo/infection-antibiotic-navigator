@@ -103,7 +103,19 @@ export const auditedInfectionRegimens: Partial<Record<InfectionId, EmpiricRegime
 };
 
 export function getCoverageDrivenRegimens(infectionId: InfectionId, context?: PatientContext): EmpiricRegimen[] {
-  const candidates = auditedInfectionRegimens[infectionId] ?? [];
+  const candidates = [...(auditedInfectionRegimens[infectionId] ?? [])];
+  const esblEligible: InfectionId[] = ["hap", "vap", "diverticulitis", "appendicitis", "cholangitis", "cholecystitis", "peritonitis", "intraAbdominal", "liverAbscess", "pyelonephritis", "prostatitis", "bacteremiaUnknown"];
+  const mrsaEligible: InfectionId[] = ["cap", "aspirationPneumonia", "hap", "vap", "cellulitis", "diabeticFootInfection", "bacteremiaUnknown", "infectiveEndocarditis"];
+  const pseudomonasEligible: InfectionId[] = ["cap", "aspirationPneumonia", "hap", "vap", "cholangitis", "peritonitis", "intraAbdominal", "liverAbscess", "pyelonephritis", "prostatitis", "diabeticFootInfection", "bacteremiaUnknown"];
+  if ((context?.esblHistory || context?.ampCHistory) && esblEligible.includes(infectionId) && !candidates.some((item) => item.drugIds.includes("meropenem"))) {
+    candidates.push(r(infectionId, `${infectionId}-esbl-mepm`, "severe", "MEPM（ESBLリスク時）", ["meropenem"], "ESBLなど耐性菌リスクが高い場合のみ候補とし、通常症例では推奨しません。"));
+  }
+  if (context?.mrsaHistory && mrsaEligible.includes(infectionId) && !candidates.some((item) => item.drugIds.includes("vancomycin"))) {
+    candidates.push(r(infectionId, `${infectionId}-mrsa-vcm`, "severe", "VCM追加（MRSAリスク時）", ["vancomycin"], "MRSA既往・保菌など明確なリスクがある場合のみ追加します。"));
+  }
+  if (context?.pseudomonasHistory && pseudomonasEligible.includes(infectionId) && !candidates.some((item) => item.drugIds.includes("cefepime") || item.drugIds.includes("piperacillinTazobactam"))) {
+    candidates.push(r(infectionId, `${infectionId}-pseudomonas-cfpm`, "severe", "CFPM（緑膿菌リスク時）", ["cefepime"], "緑膿菌の過去検出など明確なリスクがある場合に追加します。"));
+  }
   const required = requiredCoverageFor(infectionId);
   return candidates.filter((regimen) => {
     if (regimen.requiresHighResistanceRisk && !context?.esblHistory && !context?.ampCHistory) return false;

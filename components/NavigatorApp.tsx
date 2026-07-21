@@ -318,6 +318,21 @@ export default function NavigatorApp() {
           <p><strong>48〜72時間後：</strong>{result.infection.reassessmentPoints.join(" / ")}</p>
           <p><strong>de-escalation：</strong>{result.infection.deEscalation.join(" / ")}</p>
           <p><strong>参考ガイドライン：</strong>{result.infection.reference.join(" / ")}</p>
+          {result.regimenGuidance && (
+            <>
+              <p><strong>推奨培養：</strong>{result.regimenGuidance.cultures.join(" / ")}</p>
+              <p><strong>治療期間：</strong>{result.regimenGuidance.treatmentDuration}</p>
+              <p><strong>ペニシリンアレルギー時：</strong>{result.regimenGuidance.penicillinAllergy}</p>
+              <p><strong>重症例：</strong>{result.regimenGuidance.severeCase}</p>
+              <p><strong>医療関連感染：</strong>{result.regimenGuidance.healthcareAssociated}</p>
+              <p><strong>ESBL：</strong>{result.regimenGuidance.esblRisk}</p>
+              <p><strong>MRSA追加条件：</strong>{result.regimenGuidance.mrsaRisk}</p>
+              <p><strong>緑膿菌追加条件：</strong>{result.regimenGuidance.pseudomonasRisk}</p>
+              <p><strong>Enterococcus：</strong>{result.regimenGuidance.enterococcusCondition}</p>
+              <p><strong>嫌気性菌：</strong>{result.regimenGuidance.anaerobeRationale}</p>
+              {result.regimenGuidance.warnings.map((warning) => <p key={warning} className="warning-line">{warning}</p>)}
+            </>
+          )}
         </div>
         <div className="candidate-layout">
           {result.empiricRegimens.length > 0 ? (

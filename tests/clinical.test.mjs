@@ -14,6 +14,7 @@ import { getRenalDoseRecommendation } from "../lib/getRenalDoseRecommendation.ts
 import { evidenceAntibioticDoses } from "../data/antibioticDosing.ts";
 import { getMeningitisPhenotype } from "../data/meningitisDosing.ts";
 import { sourceControlRules } from "../data/sourceControl.ts";
+import { regimenGuidance } from "../data/regimenGuidance.ts";
 
 const baseContext = {
   healthcareAssociated: false,
@@ -259,6 +260,59 @@ for (const [label, infectionId] of clinicalAuditCases) {
     }
   });
 }
+
+for (const [label, infectionId] of clinicalAuditCases) {
+  test(`${label}はレジメン監査10項目・培養・期間・警告を表示する`, () => {
+    const guidance = regimenGuidance[infectionId];
+    const regimens = getCoverageDrivenRegimens(infectionId, baseContext);
+    assert.ok(regimens.some((item) => item.category === "standard"), `${label}: 第一選択`);
+    assert.ok(regimens.every((item) => item.explainWhy.length > 0), `${label}: Explain Why`);
+    assert.ok(guidance.penicillinAllergy.length > 0, `${label}: allergy`);
+    assert.ok(guidance.severeCase.length > 0, `${label}: severe`);
+    assert.ok(guidance.healthcareAssociated.length > 0, `${label}: healthcare`);
+    assert.ok(guidance.esblRisk.length > 0, `${label}: ESBL`);
+    assert.ok(guidance.mrsaRisk.length > 0, `${label}: MRSA`);
+    assert.ok(guidance.pseudomonasRisk.length > 0, `${label}: Pseudomonas`);
+    assert.ok(guidance.enterococcusCondition.length > 0, `${label}: Enterococcus`);
+    assert.ok(guidance.anaerobeRationale.length > 0, `${label}: anaerobes`);
+    assert.ok(guidance.cultures.length > 0, `${label}: cultures`);
+    assert.ok(guidance.treatmentDuration.length > 0, `${label}: duration`);
+    assert.ok(guidance.warnings.some((item) => item.includes("広域抗菌薬")));
+    assert.ok(guidance.warnings.some((item) => item.includes("de-escalation")));
+  });
+}
+
+test("重症・医療関連ではHAPレジメンが変更される", () => {
+  const routine = getCoverageDrivenRegimens("hap", baseContext);
+  const healthcare = getCoverageDrivenRegimens("hap", { ...baseContext, healthcareAssociated: true });
+  assert.ok(!routine.some((item) => item.drugIds.includes("piperacillinTazobactam")));
+  assert.ok(healthcare.some((item) => item.drugIds.includes("piperacillinTazobactam")));
+});
+
+test("ESBLリスクで対象感染症にMEPM候補を追加する", () => {
+  for (const id of ["diverticulitis", "pyelonephritis", "cholangitis"]) {
+    assert.ok(getCoverageDrivenRegimens(id, { ...baseContext, esblHistory: true }).some((item) => item.drugIds.includes("meropenem")), id);
+  }
+});
+
+test("MRSAリスクで対象感染症にVCM候補を追加する", () => {
+  for (const id of ["cap", "cellulitis", "bacteremiaUnknown"]) {
+    assert.ok(getCoverageDrivenRegimens(id, { ...baseContext, mrsaHistory: true }).some((item) => item.drugIds.includes("vancomycin")), id);
+  }
+});
+
+test("緑膿菌リスクで対象感染症に抗緑膿菌薬候補を追加する", () => {
+  for (const id of ["cap", "pyelonephritis", "bacteremiaUnknown"]) {
+    assert.ok(getCoverageDrivenRegimens(id, { ...baseContext, pseudomonasHistory: true }).some((item) => item.drugIds.includes("cefepime") || item.drugIds.includes("piperacillinTazobactam")), id);
+  }
+});
+
+test("嫌気性菌必須疾患でCTRX単独を第一選択にしない", () => {
+  for (const id of ["diverticulitis", "appendicitis", "peritonitis", "intraAbdominal", "liverAbscess"]) {
+    const standards = getCoverageDrivenRegimens(id, baseContext).filter((item) => item.category === "standard");
+    assert.ok(!standards.some((item) => item.drugIds.length === 1 && item.drugIds[0] === "ceftriaxone"), id);
+  }
+});
 
 test("監査対象では軽症にMEPMを第一選択表示しない", () => {
   for (const [, infectionId] of clinicalAuditCases) {
