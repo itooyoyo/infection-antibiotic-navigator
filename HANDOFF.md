@@ -3,7 +3,7 @@
 - Repository: itooyoyo/infection-antibiotic-navigator
 - Branch: codex/esbl-safety-review
 - Base: 290132d90633bcc4c14b873e80bbf580f0306917
-- Version: local uncommitted review draft, 2026-11-17
+- Version: review draft, 2026-11-17; implementation commit 245070f3d1bb06e5a32e009d6d30c8225ea40adb
 - Status: medical expert review pending; not approved for clinical use or deployment.
 
 ## Changes
@@ -31,9 +31,13 @@ Existing and added pure-function regressions: 287 passed, 0 failed. Added urinar
 - Susceptibility input is deliberately coarse; strain, sample site, exact detection date and specific alternative agent need professional interpretation.
 - Incomplete data must not delay urgent treatment. Severe infections, CNS infection, shock and CRE require specialist assessment; absence of MEPM suggestion is not evidence that it is unnecessary.
 - Existing condition-specific severe/alternative reference lists remain references, not automatically selected prescriptions. Upstream regimen data still needs a broader independent medical audit.
-- Browser/mobile verification and real-patient validation are pending.
-- Sharing preparation requires the established prepare.py flow; no GitHub save has been authorized.
+- Browser/mobile verification, iPhone Safari device testing and real-patient validation are pending.
+- AI council medical review is incomplete. User-reported approval authorizes branch storage only; it is not recorded as completed medical validation.
 
 ## Approval boundaries
 
-No push, main merge, Vercel deployment or handoff upload performed. Each needs separate explicit approval. No patient data or credentials are included in this document.
+The user authorized storage in the Public repository itooyoyo/infection-antibiotic-navigator on codex/esbl-safety-review. Implementation commit 245070f3d1bb06e5a32e009d6d30c8225ea40adb was pushed to that branch. Main merge, Vercel deployment and writes to other repositories remain prohibited. No patient records or credentials are included in this document.
+
+## Requested medical review
+
+Please review the ESBL assessment, distinction between severity and resistance risk, concordance between candidate and regimen displays, urinary/nonurinary treatment conditions, handling of missing microbiology and timing, and LVFX warnings. The 287 passing software tests do not establish clinical safety. Review the unresolved risks above before any clinical release.
