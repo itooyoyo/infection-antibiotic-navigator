@@ -187,7 +187,7 @@ export default function NavigatorApp() {
   const [renal, setRenal] = useState<RenalInput>({ ...defaultRenal });
   const [sourceControl, setSourceControl] = useState<Record<string, boolean>>({});
   const [reassessment, setReassessment] = useState<ReassessmentInput>({ ...defaultReassessment });
-  const [severity, setSeverity] = useState("中等症候補");
+  const severity = esblEvidence.severity === "severe" ? "重症" : esblEvidence.severity === "nonsevere" ? "非重症" : "未評価";
   const [doseDrugIds, setDoseDrugIds] = useState<string[]>([]);
   const [meningitisPhenotypeId, setMeningitisPhenotypeId] = useState<MeningitisPhenotypeId>("community-18-49");
   const [cultureResults, setCultureResults] = useState<CultureResults>(() => emptyCultureResults());
@@ -210,20 +210,18 @@ export default function NavigatorApp() {
         infectionId,
         context,
         severity,
-        selectedDrugs: Array.from(new Map([...result.standardCandidates, ...result.severeCandidates, ...result.alternativeCandidates].map((drug) => [drug.id, drug])).values()),
+        selectedDrugs: result.selectedCandidates,
         sourceControl,
         renal: result.renal,
       }),
-    [infectionId, context, severity, sourceControl, result.standardCandidates, result.severeCandidates, result.alternativeCandidates, result.renal],
+    [infectionId, context, severity, sourceControl, result.selectedCandidates, result.renal],
   );
   const doseCandidates = useMemo(
-    () => Array.from(new Map([...result.standardCandidates, ...result.severeCandidates, ...result.alternativeCandidates].map((drug) => [drug.id, drug])).values()),
-    [result.standardCandidates, result.severeCandidates, result.alternativeCandidates],
+    () => Array.from(new Map([...result.selectedCandidates, ...currentTherapyIds.map(id => antibiotics.find(drug => drug.id === id)).filter((drug): drug is typeof antibiotics[number] => Boolean(drug))].map(drug => [drug.id, drug])).values()),
+    [result.selectedCandidates, currentTherapyIds],
   );
   const meningitisPhenotype = getMeningitisPhenotype(meningitisPhenotypeId);
-  const visibleDoseCandidates = infectionId === "bacterialMeningitis"
-    ? doseCandidates.filter((drug) => meningitisPhenotype.candidateDrugIds.includes(drug.id))
-    : doseCandidates;
+  const visibleDoseCandidates = doseCandidates;
   const deescalation = useMemo(
     () => assessDeescalation({ currentDrugs: currentTherapyIds, cultures: cultureResults, mrsaScreenNegative }),
     [currentTherapyIds, cultureResults, mrsaScreenNegative],
@@ -386,8 +384,11 @@ export default function NavigatorApp() {
         <StepHeading step="Step 5" title="経験的抗菌薬候補" lead="培養採取、追加カバー条件、狭域化条件を同じ画面で確認します。" />
         <div className="recommendation-focus" aria-live="polite">
           <h3>推奨抗菌薬候補</h3>
-          <strong>{result.selectedCandidates.map((drug) => drug.genericName).join(" / ") || "条件の確認が必要です"}</strong>
+          <strong>{result.plan.currentRegimens.map(regimen => `${regimen.label}（${regimen.drugIds.map(id => antibiotics.find(drug => drug.id === id)?.genericName ?? id).join(" ＋ ")}）`).join(" / ") || "現在推奨は未確定・専門家と確認"}</strong>
+          <p role="alert">{result.plan.warning}</p>
+          {result.clinicalSeverity.warning && <p role="alert" className="drug-alert">{result.clinicalSeverity.warning}</p>}
           <p>{result.esblAssessment.message}</p>
+          <p>{result.esblAssessment.timingNote}</p>
           <p>{result.esblAssessment.reviewStatus}。不明項目: {result.esblAssessment.unknowns.join(" / ") || "なし"}</p>
         </div>
         <div className="renal-grid">
@@ -395,6 +396,10 @@ export default function NavigatorApp() {
           <label>ESBL検出時期<select value={esblEvidence.historyTiming} onChange={(e) => setEsblEvidence({ ...esblEvidence, historyTiming: e.target.value as EsblEvidence["historyTiming"] })}><option value="unknown">不明</option><option value="within12Months">過去12か月以内</option><option value="older">12か月より前</option></select></label>
           <label>培養情報<select value={esblEvidence.culture} onChange={(e) => setEsblEvidence({ ...esblEvidence, culture: e.target.value as EsblEvidence["culture"] })}><option value="unknown">不明・結果待ち</option><option value="priorOnly">過去培養のみ</option><option value="currentConfirmed">現在の起因菌としてESBL確認</option><option value="currentNegative">現在の起因菌は非ESBL確認</option></select></label>
           <label>感受性情報<select value={esblEvidence.susceptibility} onChange={(e) => setEsblEvidence({ ...esblEvidence, susceptibility: e.target.value as EsblEvidence["susceptibility"] })}><option value="unknown">不明</option><option value="alternativeSusceptible">感染部位に適した代替薬に感受性</option><option value="carbapenemSusceptible">カルバペネム感受性確認</option><option value="carbapenemResistant">カルバペネム耐性</option></select></label>
+          <label>確認菌種<select value={esblEvidence.organism ?? "unknown"} onChange={e => setEsblEvidence({ ...esblEvidence, organism: e.target.value as EsblEvidence["organism"] })}><option value="unknown">不明・未同定</option><option value="enterobacterales">Enterobacterales（菌種詳細は検査報告確認）</option><option value="other">その他・別機序を評価</option></select></label>
+          <label>検体と感染巣<select value={esblEvidence.specimenRelation ?? "unknown"} onChange={e => setEsblEvidence({ ...esblEvidence, specimenRelation: e.target.value as EsblEvidence["specimenRelation"] })}><option value="unknown">関連不明</option><option value="currentSite">現在感染巣の起因菌として確認</option><option value="otherSite">別部位・保菌の可能性</option></select></label>
+          <label>代替薬の適合性<select value={esblEvidence.alternativeSuitability ?? "unknown"} onChange={e => setEsblEvidence({ ...esblEvidence, alternativeSuitability: e.target.value as EsblEvidence["alternativeSuitability"] })}><option value="unknown">未確認</option><option value="suitable">感染部位・重症度・安全性に適合</option><option value="unsuitable">不適合・使用困難</option></select></label>
+          <label>代替薬の感受性<select value={esblEvidence.alternativeActivity ?? "unknown"} onChange={e => setEsblEvidence({ ...esblEvidence, alternativeActivity: e.target.value as EsblEvidence["alternativeActivity"] })}><option value="unknown">不明</option><option value="susceptible">感受性確認</option><option value="resistant">耐性確認</option></select></label>
         </div>
         <GuideCharacter message={guideMessages.step4} />
         {infectionId === "bacterialMeningitis" && (
@@ -432,7 +437,7 @@ export default function NavigatorApp() {
             </>
           )}
         </div>
-        <div className="candidate-layout">
+        <details className="reference-regimens"><summary>参考候補・併用レジメン（現在推奨とは区別）</summary><p>各レジメンは別の選択肢です。構成薬は併用を示し、全候補の同時投与を意味しません。参考薬は現在の用量・安全性評価の対象に含めません。</p><div className="candidate-layout">
           {result.empiricRegimens.length > 0 ? (
             <>
               <RegimenColumn title="標準候補" regimens={result.empiricRegimens.filter((item) => item.category === "standard")} />
@@ -447,6 +452,7 @@ export default function NavigatorApp() {
             </>
           )}
         </div>
+        </details>
         <details className="rules-panel decision-support-panel">
           <summary>原因菌の優先順位・追加カバー条件</summary>
           <ol>{infectionDecisionSupport[infectionId].pathogenPriority.map((item) => <li key={item}>{item}</li>)}</ol>
@@ -798,11 +804,11 @@ export default function NavigatorApp() {
         <StepHeading step="Step 13" title="診療サマリー" lead="診断・処方の確定ではなく、確認事項を一画面に集約します。" />
         <div className="summary-grid">
           <SummaryItem label="感染臓器" value={result.infection.label} />
-          <SummaryItem label="重症度" value={severity} onChange={setSeverity} />
+          <SummaryItem label="重症度" value={severity} />
           <SummaryItem label="推定起因菌" value={result.pathogens.map((item) => item.name).join(" / ")} />
           <SummaryItem label="耐性菌リスク" value={resistanceRiskLabels[result.resistance.level]} />
           <SummaryItem label="培養採取" value={result.infection.firstCultures.join(" / ")} />
-          <SummaryItem label="経験的抗菌薬候補" value={result.selectedCandidates.map((drug) => drug.genericName).join(" / ")} />
+          <SummaryItem label="現在の経験的レジメン" value={result.plan.currentRegimens.map(r => r.label).join(" / ") || result.plan.warning} />
           <SummaryItem label="腎機能" value={`eGFR ${result.renal.egfrJapanese ?? "-"} / CrCl ${result.renal.crclCockcroftGault ?? "-"}`} />
           <SummaryItem label="用量調整" value={result.renal.category === "normal" ? "薬剤ごとに確認" : "腎機能調整の確認が必要"} />
           <SummaryItem label="TDM" value={result.selectedCandidates.some((drug) => drug.tdm.includes("TDM対象")) ? "TDM対象薬あり" : "通常TDM対象外候補"} />
@@ -813,7 +819,7 @@ export default function NavigatorApp() {
           <SummaryItem label="出典" value={[...result.infection.reference, "PMDA電子添文", "抗菌薬TDM臨床実践ガイドライン", "KDIGO 2024 CKD Guideline", "IDSA耐性菌ガイダンス"].join(" / ")} />
         </div>
         <p className="safety-note final">本ツールは診断・処方を自動確定するものではありません。患者の臨床状態、培養結果、施設アンチバイオグラム、院内プロトコル、最新の添付文書・ガイドラインを確認し、最終判断は担当医が行ってください。</p>
-        <StepResetButton onReset={() => setSeverity("中等症候補")} />
+        <StepResetButton onReset={() => setEsblEvidence({ ...emptyEsblEvidence })} />
       </section>
     </main>
   );

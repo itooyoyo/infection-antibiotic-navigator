@@ -2,6 +2,9 @@
 
 .recommendation-focus { padding: 20px 0; border-block: 1px solid #35d7ff; overflow-wrap: anywhere; }
 .recommendation-focus > strong { display: block; font-size: 1.5rem; color: #e5f6ff; line-height: 1.5; }
+.recommendation-focus p { font-size: 1rem; line-height: 1.65; color: #e5f6ff; }
+.reference-regimens { min-width: 0; overflow-wrap: anywhere; }
+.reference-regimens > summary { min-height: 44px; padding-block: 12px; }
 
 :root {
   --background: #030712;

@@ -10,7 +10,8 @@ import { calculateRenalFunction } from "@/data/renalDoseRules";
 import { assessReassessment, type ReassessmentInput } from "@/data/reassessmentRules";
 import type { Antibiotic } from "@/types/clinical";
 import { findSourceControlRules } from "@/data/sourceControl";
-import { assessEsbl, type EsblEvidence } from "@/data/esblAssessment";
+import { assessEsbl, assessSeverity, emptyEsblEvidence, type EsblEvidence } from "@/data/esblAssessment";
+import { buildCurrentPlan } from "./recommendationPlan";
 
 export const unsupportedConditions = [
   "小児",
@@ -86,27 +87,18 @@ export function buildRecommendation(params: {
   const renal = calculateRenalFunction(params.renalInput);
   const reassessment = assessReassessment(params.reassessment);
 
-  const esblAssessment = assessEsbl(params.infectionId, params.context.esblHistory, params.esblEvidence);
-  const standardIds = params.esblEvidence?.severity === "severe" ? infection.severeCandidateIds : infection.standardCandidateIds;
-  const mrsaEligible = ["hap", "vap", "cellulitis", "abscess", "necrotizingFasciitis", "diabeticFootInfection", "bacteremiaUnknown", "sepsis", "ventriculitis", "vpShuntInfection", "infectiveEndocarditis", "osteomyelitis", "septicArthritis", "vertebralOsteomyelitis"].includes(params.infectionId);
-  const healthcareMrsaRisk =
-    ["hap", "vap", "bacteremiaUnknown", "sepsis", "ventriculitis", "vpShuntInfection"].includes(params.infectionId)
-      ? params.context.dialysis || params.context.centralVenousCatheter
-      : false;
-  const esblEligible = ["hap", "vap", "pyelonephritis", "complicatedUti", "obstructivePyelonephritis", "cauti", "cholangitis", "cholecystitis", "intraAbdominal", "appendicitis", "diverticulitis", "peritonitis", "liverAbscess", "bacteremiaUnknown", "sepsis"].includes(
-    params.infectionId,
-  );
-  const candidateIds = Array.from(
-    new Set([
-      ...standardIds,
-      ...(mrsaEligible && (params.context.mrsaHistory || healthcareMrsaRisk) ? ["vancomycin"] : []),
-      ...(esblEligible && esblAssessment.considerMeropenem ? ["meropenem"] : []),
-    ]),
-  );
+  const evidence = params.esblEvidence ?? emptyEsblEvidence;
+  const clinicalSeverity = assessSeverity(evidence.severity, params.redFlags, params.renalInput.sepsis);
+  const esblAssessment = assessEsbl(params.infectionId, params.context.esblHistory, evidence, params.context.creHistory, clinicalSeverity.urgent);
+  const referenceRegimens = getCoverageDrivenRegimens(params.infectionId, params.context);
+  const coverageReview = params.context.esblHistory || params.context.creHistory || params.context.ampCHistory || params.context.mrsaHistory || params.context.pseudomonasHistory || params.context.drugAllergy || evidence.culture === "currentConfirmed";
+  const plan = buildCurrentPlan(referenceRegimens, esblAssessment, clinicalSeverity, coverageReview);
 
   return {
     infection,
     esblAssessment,
+    clinicalSeverity,
+    plan,
     resistance,
     redFlagResult,
     sourceControlResult,
@@ -114,11 +106,11 @@ export function buildRecommendation(params: {
     reassessment,
     pathogens: getContextualInfectionPathogens(params.infectionId, params.context),
     requiredCoverage: requiredCoverageFor(params.infectionId),
-    empiricRegimens: getCoverageDrivenRegimens(params.infectionId, params.context).filter((item) => !item.drugIds.includes("meropenem") || esblAssessment.considerMeropenem),
+    empiricRegimens: plan.references,
     regimenGuidance: regimenGuidance[params.infectionId],
     standardCandidates: getAntibiotics(infection.standardCandidateIds),
     severeCandidates: getAntibiotics(infection.severeCandidateIds),
     alternativeCandidates: getAntibiotics(infection.alternativeCandidateIds),
-    selectedCandidates: getAntibiotics(candidateIds.filter((id) => id !== "meropenem" || esblAssessment.considerMeropenem)),
+    selectedCandidates: getAntibiotics(plan.currentDrugIds),
   };
 }

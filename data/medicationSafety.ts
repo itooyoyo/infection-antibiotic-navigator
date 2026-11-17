@@ -107,8 +107,8 @@ export function evaluateMedicationSafety(drugIds: string[], input: MedicationSaf
     if (input.tendonRisk) alerts.unshift(alert("lvfx-tendon-patient", "critical", "LVFX：腱障害リスク該当", "既往・併用薬を確認し、代替薬と薬剤師相談を検討してください。", "levofloxacin"));
     if (input.aorticDiseaseRisk) alerts.unshift(alert("lvfx-aorta-patient", "critical", "LVFX：大動脈疾患リスク該当", "大動脈瘤・解離リスクを確認し、代替薬と専門家相談を検討してください。", "levofloxacin"));
     if (input.qtProlongation) alerts.push(alert("lvfx-qt", "critical", "LVFX：QT延長", "QT延長や不整脈リスクに注意し、心電図・併用薬の再確認を推奨します。", "levofloxacin", "βラクタム系などの代替薬を検討してください。"));
-    alerts.push(alert("lvfx-tendon", "warning", "LVFX：腱障害", "腱障害リスクを再確認することを推奨します。", "levofloxacin"));
-    alerts.push(alert("lvfx-aorta", "warning", "LVFX：大動脈疾患", "大動脈瘤・大動脈解離など大動脈疾患リスクを再確認することを推奨します。", "levofloxacin"));
+    if (!input.tendonRisk) alerts.push(alert("lvfx-tendon", "warning", "LVFX：腱障害", "腱障害リスクを再確認することを推奨します。", "levofloxacin"));
+    if (!input.aorticDiseaseRisk) alerts.push(alert("lvfx-aorta", "warning", "LVFX：大動脈疾患", "大動脈瘤・大動脈解離など大動脈疾患リスクを再確認することを推奨します。", "levofloxacin"));
     if (input.warfarin) alerts.push(alert("lvfx-warfarin", "critical", "LVFX＋ワルファリン", "抗凝固作用が増強する可能性に注意し、INRの再確認を推奨します。", "levofloxacin", "相互作用の少ない代替薬を検討してください。", true));
   }
   if (has("clindamycin") && input.cDiffRisk) alerts.push(alert("cldm-cdiff", "critical", "CLDM：C. difficile", "C. difficile感染症の既往・リスクに注意し、必要性の再確認を推奨します。", "clindamycin", "適応菌とアレルギー歴を踏まえて代替薬を検討してください。"));
