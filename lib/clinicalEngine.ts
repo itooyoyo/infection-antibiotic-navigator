@@ -89,10 +89,10 @@ export function buildRecommendation(params: {
 
   const evidence = params.esblEvidence ?? emptyEsblEvidence;
   const clinicalSeverity = assessSeverity(evidence.severity, params.redFlags, params.renalInput.sepsis);
-  const esblAssessment = assessEsbl(params.infectionId, params.context.esblHistory, evidence, params.context.creHistory, clinicalSeverity.urgent);
+  const esblAssessment = assessEsbl(params.infectionId, params.context.esblHistory, evidence, params.context.creHistory, clinicalSeverity.urgent, params.context);
   const referenceRegimens = getCoverageDrivenRegimens(params.infectionId, params.context);
   const coverageReview = params.context.esblHistory || params.context.creHistory || params.context.ampCHistory || params.context.mrsaHistory || params.context.pseudomonasHistory || params.context.drugAllergy || evidence.culture === "currentConfirmed";
-  const plan = buildCurrentPlan(referenceRegimens, esblAssessment, clinicalSeverity, coverageReview);
+  const plan = buildCurrentPlan(referenceRegimens, esblAssessment, clinicalSeverity, coverageReview || esblAssessment.phase === "definitive");
 
   return {
     infection,
@@ -112,5 +112,6 @@ export function buildRecommendation(params: {
     severeCandidates: getAntibiotics(infection.severeCandidateIds),
     alternativeCandidates: getAntibiotics(infection.alternativeCandidateIds),
     selectedCandidates: getAntibiotics(plan.currentDrugIds),
+    reviewCandidates: getAntibiotics(esblAssessment.reviewDrugIds),
   };
 }

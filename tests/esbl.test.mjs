@@ -16,20 +16,22 @@ for (const site of ['pyelonephritis', 'intraAbdominal']) {
   for (const severity of ['nonsevere', 'severe']) {
     for (const history of [false, true]) {
       test(`${site}/${severity}/ESBL history=${history}: unknown history is not confirmation`, () => {
-        assert.equal(assessEsbl(site, history, { ...emptyEsblEvidence, severity }).considerMeropenem, false);
+        const result = assessEsbl(site, history, { ...emptyEsblEvidence, severity });
+        assert.equal(result.considerMeropenem, history && severity === 'severe');
+        assert.equal(result.definitiveConsideration, false);
       });
     }
   }
 }
 test('recent history and severe relevant infection prompts conditional consideration', () => {
   const result = assessEsbl('pyelonephritis', true, { ...emptyEsblEvidence, severity: 'severe', historyTiming: 'within12Months' });
-  assert.equal(result.considerMeropenem, false);
+  assert.equal(result.considerMeropenem, true);
   assert.equal(result.needsUrgentCoverageReview, true);
 });
 
-const confirmed = { ...emptyEsblEvidence, severity: 'nonsevere', culture: 'currentConfirmed', organism: 'enterobacterales', specimenRelation: 'currentSite', susceptibility: 'carbapenemSusceptible' };
+const confirmed = { ...emptyEsblEvidence, treatmentPhase: 'definitive', severity: 'nonsevere', culture: 'currentConfirmed', organism: 'enterobacterales', specimenRelation: 'currentSite', susceptibility: 'carbapenemSusceptible' };
 test('susceptible and suitable alternative avoids automatic MEPM consideration in nonsevere urinary infection', () => {
-  assert.equal(assessEsbl('pyelonephritis', true, { ...confirmed, alternativeActivity: 'susceptible', alternativeSuitability: 'suitable' }).considerMeropenem, false);
+  assert.equal(assessEsbl('pyelonephritis', true, { ...confirmed, alternativeAgent: 'tmpSmx', alternativeActivity: 'susceptible', alternativeSuitability: 'suitable' }).considerMeropenem, false);
 });
 test('susceptibility alone does not establish alternative suitability', () => {
   assert.equal(assessEsbl('pyelonephritis', true, { ...confirmed, alternativeActivity: 'susceptible', alternativeSuitability: 'unknown' }).considerMeropenem, true);
