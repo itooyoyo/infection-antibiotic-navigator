@@ -10,6 +10,7 @@ import { calculateRenalFunction } from "@/data/renalDoseRules";
 import { assessReassessment, type ReassessmentInput } from "@/data/reassessmentRules";
 import type { Antibiotic } from "@/types/clinical";
 import { findSourceControlRules } from "@/data/sourceControl";
+import { assessEsbl, type EsblEvidence } from "@/data/esblAssessment";
 
 export const unsupportedConditions = [
   "小児",
@@ -76,6 +77,7 @@ export function buildRecommendation(params: {
   sourceControl: SourceControlState;
   renalInput: RenalInput;
   reassessment: ReassessmentInput;
+  esblEvidence?: EsblEvidence;
 }) {
   const infection = getInfectionProfile(params.infectionId);
   const resistance = scoreResistanceRisk(params.context);
@@ -84,7 +86,8 @@ export function buildRecommendation(params: {
   const renal = calculateRenalFunction(params.renalInput);
   const reassessment = assessReassessment(params.reassessment);
 
-  const standardIds = resistance.level === "high" ? infection.severeCandidateIds : infection.standardCandidateIds;
+  const esblAssessment = assessEsbl(params.infectionId, params.context.esblHistory, params.esblEvidence);
+  const standardIds = params.esblEvidence?.severity === "severe" ? infection.severeCandidateIds : infection.standardCandidateIds;
   const mrsaEligible = ["hap", "vap", "cellulitis", "abscess", "necrotizingFasciitis", "diabeticFootInfection", "bacteremiaUnknown", "sepsis", "ventriculitis", "vpShuntInfection", "infectiveEndocarditis", "osteomyelitis", "septicArthritis", "vertebralOsteomyelitis"].includes(params.infectionId);
   const healthcareMrsaRisk =
     ["hap", "vap", "bacteremiaUnknown", "sepsis", "ventriculitis", "vpShuntInfection"].includes(params.infectionId)
@@ -97,12 +100,13 @@ export function buildRecommendation(params: {
     new Set([
       ...standardIds,
       ...(mrsaEligible && (params.context.mrsaHistory || healthcareMrsaRisk) ? ["vancomycin"] : []),
-      ...(esblEligible && params.context.esblHistory ? ["meropenem"] : []),
+      ...(esblEligible && esblAssessment.considerMeropenem ? ["meropenem"] : []),
     ]),
   );
 
   return {
     infection,
+    esblAssessment,
     resistance,
     redFlagResult,
     sourceControlResult,
@@ -110,11 +114,11 @@ export function buildRecommendation(params: {
     reassessment,
     pathogens: getContextualInfectionPathogens(params.infectionId, params.context),
     requiredCoverage: requiredCoverageFor(params.infectionId),
-    empiricRegimens: getCoverageDrivenRegimens(params.infectionId, params.context),
+    empiricRegimens: getCoverageDrivenRegimens(params.infectionId, params.context).filter((item) => !item.drugIds.includes("meropenem") || esblAssessment.considerMeropenem),
     regimenGuidance: regimenGuidance[params.infectionId],
     standardCandidates: getAntibiotics(infection.standardCandidateIds),
     severeCandidates: getAntibiotics(infection.severeCandidateIds),
     alternativeCandidates: getAntibiotics(infection.alternativeCandidateIds),
-    selectedCandidates: getAntibiotics(candidateIds),
+    selectedCandidates: getAntibiotics(candidateIds.filter((id) => id !== "meropenem" || esblAssessment.considerMeropenem)),
   };
 }

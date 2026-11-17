@@ -1,5 +1,8 @@
 @import "tailwindcss";
 
+.recommendation-focus { padding: 20px 0; border-block: 1px solid #35d7ff; overflow-wrap: anywhere; }
+.recommendation-focus > strong { display: block; font-size: 1.5rem; color: #e5f6ff; line-height: 1.5; }
+
 :root {
   --background: #030712;
   --foreground: #e5f6ff;

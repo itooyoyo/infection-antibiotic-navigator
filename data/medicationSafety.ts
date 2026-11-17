@@ -1,6 +1,8 @@
 export type SafetySeverity = "info" | "warning" | "critical";
 
 export type MedicationSafetyInput = {
+  tendonRisk?: boolean;
+  aorticDiseaseRisk?: boolean;
   betaLactamAllergy: boolean;
   penicillinAnaphylaxis: boolean;
   pregnancy: boolean;
@@ -34,6 +36,8 @@ export type SafetyAlert = {
 };
 
 export const medicationSafetyInputLabels: Array<[keyof Omit<MedicationSafetyInput, "aki" | "severeRenalImpairment">, string]> = [
+  ["tendonRisk", "腱障害既往・リスク"],
+  ["aorticDiseaseRisk", "大動脈瘤・解離の既往・リスク"],
   ["betaLactamAllergy", "βラクタムアレルギー"],
   ["penicillinAnaphylaxis", "ペニシリンアナフィラキシー歴"],
   ["pregnancy", "妊娠"],
@@ -100,6 +104,8 @@ export function evaluateMedicationSafety(drugIds: string[], input: MedicationSaf
   if (has("piperacillinTazobactam")) alerts.push(alert("piptaz-sodium", "warning", "PIPC/TAZ：Na負荷", "心不全、腎障害、輸液量を踏まえてナトリウム負荷への注意を推奨します。", "piperacillinTazobactam"));
   if (has("ampicillin")) alerts.push(alert("abpc-ebv", "info", "ABPC：EBV発疹", "EBV感染が疑われる場合は発疹リスクへの注意を推奨します。", "ampicillin"));
   if (has("levofloxacin")) {
+    if (input.tendonRisk) alerts.unshift(alert("lvfx-tendon-patient", "critical", "LVFX：腱障害リスク該当", "既往・併用薬を確認し、代替薬と薬剤師相談を検討してください。", "levofloxacin"));
+    if (input.aorticDiseaseRisk) alerts.unshift(alert("lvfx-aorta-patient", "critical", "LVFX：大動脈疾患リスク該当", "大動脈瘤・解離リスクを確認し、代替薬と専門家相談を検討してください。", "levofloxacin"));
     if (input.qtProlongation) alerts.push(alert("lvfx-qt", "critical", "LVFX：QT延長", "QT延長や不整脈リスクに注意し、心電図・併用薬の再確認を推奨します。", "levofloxacin", "βラクタム系などの代替薬を検討してください。"));
     alerts.push(alert("lvfx-tendon", "warning", "LVFX：腱障害", "腱障害リスクを再確認することを推奨します。", "levofloxacin"));
     alerts.push(alert("lvfx-aorta", "warning", "LVFX：大動脈疾患", "大動脈瘤・大動脈解離など大動脈疾患リスクを再確認することを推奨します。", "levofloxacin"));

@@ -6,6 +6,8 @@ export const resistanceRiskLabels: Record<RiskLevel, string> = {
   high: "高い",
 };
 
+export const resistanceRiskLimitations = "耐性菌リスクスコアは重症度ではなく、検証済みの処方決定スコアでもありません。高値だけで広域薬を確定しません。";
+
 export type ResistanceRiskRule = {
   key: keyof PatientContext;
   weight: number;

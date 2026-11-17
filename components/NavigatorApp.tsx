@@ -1,4 +1,5 @@
 "use client";
+import { emptyEsblEvidence, type EsblEvidence } from "@/data/esblAssessment";
 
 import Image from "next/image";
 import { useMemo, useState } from "react";
@@ -179,6 +180,7 @@ function GuideCharacter({ message }: { message: string }) {
 }
 
 export default function NavigatorApp() {
+  const [esblEvidence, setEsblEvidence] = useState<EsblEvidence>({ ...emptyEsblEvidence });
   const [infectionId, setInfectionId] = useState<InfectionId>("cap");
   const [redFlags, setRedFlags] = useState<Record<string, boolean>>({});
   const [context, setContext] = useState<PatientContext>({ ...defaultContext });
@@ -199,8 +201,8 @@ export default function NavigatorApp() {
   const [persistentBacteremia, setPersistentBacteremia] = useState(false);
 
   const result = useMemo(
-    () => buildRecommendation({ infectionId, context, redFlags, sourceControl, renalInput: renal, reassessment }),
-    [infectionId, context, redFlags, sourceControl, renal, reassessment],
+    () => buildRecommendation({ infectionId, context, redFlags, sourceControl, renalInput: renal, reassessment, esblEvidence }),
+    [infectionId, context, redFlags, sourceControl, renal, reassessment, esblEvidence],
   );
   const reasoning = useMemo(
     () =>
@@ -358,23 +360,22 @@ export default function NavigatorApp() {
           <summary>患者背景・併用薬を入力</summary>
           <div className="toggle-grid compact">
             {medicationSafetyInputLabels.map(([key, label]) => (
-              <ToggleButton key={key} label={label} active={medicationSafety[key]} onClick={() => setMedicationSafety((current) => ({ ...current, [key]: !current[key] }))} />
+              <ToggleButton key={key} label={label} active={Boolean(medicationSafety[key])} onClick={() => setMedicationSafety((current) => ({ ...current, [key]: !current[key] }))} />
             ))}
           </div>
         </details>
-        <details className="reasoning-accordion" open>
-          <summary>安全性評価</summary>
+        <section aria-label="重要な安全性警告">
           <div className="medication-safety-results" aria-live="polite">
             {safetyAlerts.length > 0 ? safetyAlerts.map((safetyAlert) => (
               <article key={safetyAlert.id} className={`medication-safety-alert ${safetyAlert.severity}`}>
                 <span>{safetyAlert.severity === "critical" ? "重大" : safetyAlert.severity === "warning" ? "注意" : "情報"}</span>
                 <h3>{safetyAlert.title}</h3>
-                <p>{safetyAlert.message}</p>
+                {safetyAlert.severity === "info" ? <details><summary>詳細</summary><p>{safetyAlert.message}</p></details> : <p>{safetyAlert.message}</p>}
                 {safetyAlert.alternative && <strong>代替薬候補：{safetyAlert.alternative}</strong>}
               </article>
             )) : <p className="micro-note">選択中の条件では重大な安全性シグナルは検出されていません。患者情報と最新資料の再確認を推奨します。</p>}
           </div>
-        </details>
+        </section>
         <div className="stewardship-legend" aria-label="安全性警告レベル">
           <span className="info">情報</span><span className="warning">注意</span><span className="critical">重大</span>
         </div>
@@ -383,6 +384,18 @@ export default function NavigatorApp() {
 
       <section className="step-block">
         <StepHeading step="Step 5" title="経験的抗菌薬候補" lead="培養採取、追加カバー条件、狭域化条件を同じ画面で確認します。" />
+        <div className="recommendation-focus" aria-live="polite">
+          <h3>推奨抗菌薬候補</h3>
+          <strong>{result.selectedCandidates.map((drug) => drug.genericName).join(" / ") || "条件の確認が必要です"}</strong>
+          <p>{result.esblAssessment.message}</p>
+          <p>{result.esblAssessment.reviewStatus}。不明項目: {result.esblAssessment.unknowns.join(" / ") || "なし"}</p>
+        </div>
+        <div className="renal-grid">
+          <label>臨床的重症度<select value={esblEvidence.severity} onChange={(e) => setEsblEvidence({ ...esblEvidence, severity: e.target.value as EsblEvidence["severity"] })}><option value="unknown">不明・未評価</option><option value="nonsevere">非重症</option><option value="severe">重症</option></select></label>
+          <label>ESBL検出時期<select value={esblEvidence.historyTiming} onChange={(e) => setEsblEvidence({ ...esblEvidence, historyTiming: e.target.value as EsblEvidence["historyTiming"] })}><option value="unknown">不明</option><option value="within12Months">過去12か月以内</option><option value="older">12か月より前</option></select></label>
+          <label>培養情報<select value={esblEvidence.culture} onChange={(e) => setEsblEvidence({ ...esblEvidence, culture: e.target.value as EsblEvidence["culture"] })}><option value="unknown">不明・結果待ち</option><option value="priorOnly">過去培養のみ</option><option value="currentConfirmed">現在の起因菌としてESBL確認</option><option value="currentNegative">現在の起因菌は非ESBL確認</option></select></label>
+          <label>感受性情報<select value={esblEvidence.susceptibility} onChange={(e) => setEsblEvidence({ ...esblEvidence, susceptibility: e.target.value as EsblEvidence["susceptibility"] })}><option value="unknown">不明</option><option value="alternativeSusceptible">感染部位に適した代替薬に感受性</option><option value="carbapenemSusceptible">カルバペネム感受性確認</option><option value="carbapenemResistant">カルバペネム耐性</option></select></label>
+        </div>
         <GuideCharacter message={guideMessages.step4} />
         {infectionId === "bacterialMeningitis" && (
           <div className="rules-panel">
@@ -434,8 +447,8 @@ export default function NavigatorApp() {
             </>
           )}
         </div>
-        <div className="rules-panel decision-support-panel">
-          <h3>原因菌の優先順位・追加カバー条件</h3>
+        <details className="rules-panel decision-support-panel">
+          <summary>原因菌の優先順位・追加カバー条件</summary>
           <ol>{infectionDecisionSupport[infectionId].pathogenPriority.map((item) => <li key={item}>{item}</li>)}</ol>
           <p><strong>MRSA：</strong>{infectionDecisionSupport[infectionId].mrsa}</p>
           <p><strong>緑膿菌：</strong>{infectionDecisionSupport[infectionId].pseudomonas}</p>
@@ -444,7 +457,7 @@ export default function NavigatorApp() {
           <p><strong>CRE：</strong>{infectionDecisionSupport[infectionId].cre}</p>
           <p><strong>嫌気性菌：</strong>{infectionDecisionSupport[infectionId].anaerobes}</p>
           {infectionDecisionSupport[infectionId].adjuncts?.map((item) => <p key={item} className="clinical-adjunct">{item}</p>)}
-        </div>
+        </details>
         <GuideCharacter message={guideMessages.explain} />
         <details className="reasoning-accordion alternative-reasoning">
           <summary>なぜ他の薬ではない？</summary>
