@@ -46,7 +46,7 @@ test('shock requires urgent coverage review and current recommendation is not a 
 });
 
 test('ESBL history plus shock with pending culture displays review-only MEPM with shared safety references', () => {
-  const result = run('pyelonephritis', { context: { ...context, esblHistory: true }, redFlags: { '収縮期血圧低下': true }, renalInput: { ...renalInput, aki: true, stableRenalFunction: false, sepsis: true } });
+  const result = run('pyelonephritis', { context: { ...context, esblHistory: true }, esblEvidence: { ...emptyEsblEvidence, severity: 'nonsevere', historyRelevance: 'related' }, redFlags: { '収縮期血圧低下': true }, renalInput: { ...renalInput, aki: true, stableRenalFunction: false, sepsis: true } });
   assert.equal(result.esblAssessment.empiricConsideration, true);
   assert.equal(result.esblAssessment.definitiveConsideration, false);
   assert.deepEqual(result.selectedCandidates, []);
@@ -75,4 +75,29 @@ test('review candidates do not replace a combination or pull alternatives into s
   const result = run('diverticulitis');
   assert.deepEqual(medicationReferenceIds(result.plan.currentDrugIds, [], []), result.selectedCandidates.map(d => d.id));
   assert.deepEqual(medicationReferenceIds(['ceftriaxone', 'metronidazole'], ['meropenem'], ['ceftriaxone']), ['ceftriaxone', 'metronidazole', 'meropenem']);
+});
+
+test('pneumonia with unrelated ESBL history never adds MEPM to current or review drug scope', () => {
+  for (const infectionId of ['cap', 'aspirationPneumonia']) {
+    const result = run(infectionId, { context: { ...context, esblHistory: true, recentAntibiotics: true, antibiogramAvailable: true }, esblEvidence: { ...emptyEsblEvidence, severity: 'severe', historyRelevance: 'unrelated', localAlternativeCoverage: 'limited' } });
+    assert.equal(result.esblAssessment.considerMeropenem, false);
+    assert.deepEqual(result.selectedCandidates, []);
+    assert.ok(!result.reviewCandidates.some(d => d.id === 'meropenem'));
+    assert.equal(result.plan.status, 'reviewRequired');
+  }
+});
+
+test('related ESBL in complicated urinary shock keeps review-only MEPM and valproate/AKI warnings', () => {
+  const renal = { ...renalInput, aki: true, stableRenalFunction: false, sepsis: true };
+  const result = run('complicatedUti', { context: { ...context, esblHistory: true }, esblEvidence: { ...emptyEsblEvidence, severity: 'nonsevere', historyRelevance: 'related' }, redFlags: { '収縮期血圧低下': true }, renalInput: renal });
+  assert.equal(result.esblAssessment.considerMeropenem, true);
+  assert.deepEqual(result.plan.currentRegimens, []);
+  const ids = medicationReferenceIds(result.plan.currentDrugIds, result.reviewCandidates.map(d => d.id), ['levofloxacin']);
+  assert.deepEqual(ids, ['meropenem', 'levofloxacin']);
+  const alerts = evaluateMedicationSafety(ids, { ...emptyMedicationSafetyInput(), valproate: true, tendonRisk: true, aorticDiseaseRisk: true, aki: true });
+  assert.ok(alerts.some(a => a.id === 'mepm-valproate' && a.severity === 'critical'));
+  assert.ok(alerts.some(a => a.id === 'lvfx-tendon-patient' && a.severity === 'critical'));
+  assert.ok(alerts.some(a => a.id === 'lvfx-aorta-patient' && a.severity === 'critical'));
+  const dose = getRenalDoseRecommendation({ drugId: 'meropenem', indication: 'complicatedUti', renal: result.renal, renalInput: renal });
+  assert.match(dose.warnings.join(' '), /非定常|不正確/);
 });

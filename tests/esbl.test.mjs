@@ -16,7 +16,7 @@ for (const site of ['pyelonephritis', 'intraAbdominal']) {
   for (const severity of ['nonsevere', 'severe']) {
     for (const history of [false, true]) {
       test(`${site}/${severity}/ESBL history=${history}: unknown history is not confirmation`, () => {
-        const result = assessEsbl(site, history, { ...emptyEsblEvidence, severity });
+        const result = assessEsbl(site, history, { ...emptyEsblEvidence, severity, historyRelevance: 'related' });
         assert.equal(result.considerMeropenem, history && severity === 'severe');
         assert.equal(result.definitiveConsideration, false);
       });
@@ -24,7 +24,7 @@ for (const site of ['pyelonephritis', 'intraAbdominal']) {
   }
 }
 test('recent history and severe relevant infection prompts conditional consideration', () => {
-  const result = assessEsbl('pyelonephritis', true, { ...emptyEsblEvidence, severity: 'severe', historyTiming: 'within12Months' });
+  const result = assessEsbl('pyelonephritis', true, { ...emptyEsblEvidence, severity: 'severe', historyTiming: 'within12Months', historyRelevance: 'related' });
   assert.equal(result.considerMeropenem, true);
   assert.equal(result.needsUrgentCoverageReview, true);
 });

@@ -1,5 +1,5 @@
 "use client";
-import { emptyEsblEvidence, type EsblEvidence } from "@/data/esblAssessment";
+import { emptyEsblEvidence, esblEvidenceForSiteChange, type EsblEvidence } from "@/data/esblAssessment";
 
 import Image from "next/image";
 import { useMemo, useState } from "react";
@@ -183,6 +183,10 @@ function GuideCharacter({ message }: { message: string }) {
 export default function NavigatorApp() {
   const [esblEvidence, setEsblEvidence] = useState<EsblEvidence>({ ...emptyEsblEvidence });
   const [infectionId, setInfectionId] = useState<InfectionId>("cap");
+  const changeInfection = (nextId: InfectionId) => {
+    setEsblEvidence(current => esblEvidenceForSiteChange(current, infectionId, nextId));
+    setInfectionId(nextId);
+  };
   const [redFlags, setRedFlags] = useState<Record<string, boolean>>({});
   const [context, setContext] = useState<PatientContext>({ ...defaultContext });
   const [renal, setRenal] = useState<RenalInput>({ ...defaultRenal });
@@ -298,7 +302,7 @@ export default function NavigatorApp() {
         <StepHeading step="Step 1" title="感染臓器・病型" lead="初期版の対象感染症に限定して候補を表示します。" />
         <div className="select-line">
           <label htmlFor="infection">感染臓器・病型</label>
-          <select id="infection" value={infectionId} onChange={(event) => setInfectionId(event.target.value as InfectionId)}>
+          <select id="infection" value={infectionId} onChange={(event) => changeInfection(event.target.value as InfectionId)}>
             {infectionProfiles.map((profile) => (
               <option key={profile.id} value={profile.id}>
                 {profile.group}：{profile.label}
@@ -310,7 +314,7 @@ export default function NavigatorApp() {
           <strong>初期版の対象外</strong>
           <span>{unsupportedConditions.join(" / ")} は専門医・専門ガイドラインの確認を推奨します。</span>
         </div>
-        <StepResetButton onReset={() => setInfectionId("cap")} />
+        <StepResetButton onReset={() => changeInfection("cap")} />
       </section>
 
       <section className="step-block">
@@ -350,7 +354,7 @@ export default function NavigatorApp() {
           ))}
         </div>
         {infectionId === "cap" && <p className="micro-note">尿中肺炎球菌抗原陽性だけで肺炎球菌性肺炎と断定せず、臨床像・培養・画像と合わせて判断してください。</p>}
-        <StepResetButton onReset={() => setInfectionId("cap")} />
+        <StepResetButton onReset={() => changeInfection("cap")} />
       </section>
 
       <section className="step-block">
@@ -391,6 +395,7 @@ export default function NavigatorApp() {
           <h3>{result.esblAssessment.phase === "empiric" ? "経験的治療" : "確定治療"}：MEPM判断</h3>
           <strong>{result.esblAssessment.considerMeropenem ? "メロペネム（MEPM）：検討候補" : "MEPMの活性・適応を個別確認"}</strong>
           <p>{result.esblAssessment.message}</p>
+          {result.esblAssessment.historyReviewWarning && <p role="alert" className="drug-alert">{result.esblAssessment.historyReviewWarning}</p>}
           {result.esblAssessment.needsUrgentCoverageReview && <p role="alert" className="drug-alert">{result.esblAssessment.emergencyWarning}</p>}
           {result.reviewCandidates.length > 0 && <p>検討薬（{result.reviewCandidates.map(drug => drug.genericName).join(" / ")}）も用量・安全性確認に含めます。これは併用推奨ではありません。MEPM単剤で必要カバー全体を満たすとは限らず、必要な併用は別途確認してください。</p>}
           {result.esblAssessment.alternativeSafetyWarning && <p role="alert" className="drug-alert">{result.esblAssessment.alternativeSafetyWarning}</p>}
@@ -403,6 +408,7 @@ export default function NavigatorApp() {
           <label>施設情報：通常の代替薬カバー<select value={esblEvidence.localAlternativeCoverage ?? "unknown"} onChange={e => setEsblEvidence({ ...esblEvidence, localAlternativeCoverage: e.target.value as EsblEvidence["localAlternativeCoverage"] })}><option value="unknown">不明・未評価</option><option value="adequate">感染部位に照らし期待できる</option><option value="limited">耐性等で限られる</option></select></label>
           <label>臨床的重症度<select value={esblEvidence.severity} onChange={(e) => setEsblEvidence({ ...esblEvidence, severity: e.target.value as EsblEvidence["severity"] })}><option value="unknown">不明・未評価</option><option value="nonsevere">非重症</option><option value="severe">重症</option></select></label>
           <label>ESBL検出時期<select value={esblEvidence.historyTiming} onChange={(e) => setEsblEvidence({ ...esblEvidence, historyTiming: e.target.value as EsblEvidence["historyTiming"] })}><option value="unknown">不明</option><option value="within12Months">過去12か月以内</option><option value="older">12か月より前</option></select></label>
+          <label>ESBL既往と今回の関連<select value={esblEvidence.historyRelevance ?? "unknown"} onChange={e => setEsblEvidence({ ...esblEvidence, historyRelevance: e.target.value as EsblEvidence["historyRelevance"] })}><option value="unknown">不明・未評価</option><option value="related">今回の感染巣・想定菌との関連を評価</option><option value="unrelated">関連しないと評価</option></select></label>
           <label>培養情報<select value={esblEvidence.culture} onChange={(e) => setEsblEvidence({ ...esblEvidence, culture: e.target.value as EsblEvidence["culture"] })}><option value="unknown">不明・結果待ち</option><option value="priorOnly">過去培養のみ</option><option value="currentConfirmed">現在の起因菌としてESBL確認</option><option value="currentNegative">現在の起因菌は非ESBL確認</option></select></label>
           <label>感受性情報<select value={esblEvidence.susceptibility} onChange={(e) => setEsblEvidence({ ...esblEvidence, susceptibility: e.target.value as EsblEvidence["susceptibility"] })}><option value="unknown">不明</option><option value="alternativeSusceptible">感染部位に適した代替薬に感受性</option><option value="carbapenemSusceptible">カルバペネム感受性確認</option><option value="carbapenemResistant">カルバペネム耐性</option></select></label>
           <label>確認菌種<select value={esblEvidence.organism ?? "unknown"} onChange={e => setEsblEvidence({ ...esblEvidence, organism: e.target.value as EsblEvidence["organism"] })}><option value="unknown">不明・未同定</option><option value="enterobacterales">Enterobacterales（菌種詳細は検査報告確認）</option><option value="other">その他・別機序を評価</option></select></label>

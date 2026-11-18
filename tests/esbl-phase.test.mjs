@@ -2,7 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { assessEsbl, emptyEsblEvidence } from '../data/esblAssessment.ts';
 
-const empirical = { ...emptyEsblEvidence, treatmentPhase: 'empiric', severity: 'severe' };
+const empirical = { ...emptyEsblEvidence, treatmentPhase: 'empiric', severity: 'severe', historyRelevance: 'related' };
 const definitive = { ...empirical, treatmentPhase: 'definitive', culture: 'currentConfirmed', organism: 'enterobacterales', specimenRelation: 'currentSite', susceptibility: 'carbapenemSusceptible' };
 
 for (const timing of ['unknown', 'older', 'within12Months']) test(`empiric shock/history/pending: timing ${timing} does not exclude MEPM review`, () => {
@@ -22,16 +22,16 @@ test('nonsevere urinary history alone does not automatically escalate', () => {
   assert.equal(assessEsbl('pyelonephritis', true, { ...empirical, severity: 'nonsevere' }).considerMeropenem, false);
 });
 
-test('recent exposure and local limited alternatives contribute without inferred current susceptibility', () => {
+test('recent exposure and local limited alternatives do not establish ESBL history or current susceptibility', () => {
   const result = assessEsbl('intraAbdominal', false, { ...empirical, localAlternativeCoverage: 'limited' }, false, false, { recentAntibiotics: true, antibiogramAvailable: true });
-  assert.equal(result.empiricConsideration, true);
+  assert.equal(result.empiricConsideration, false);
   assert.ok(result.unknowns.includes('susceptibility'));
   assert.equal(assessEsbl('intraAbdominal', false, empirical).considerMeropenem, false);
 });
 
-test('prior sensitivity contributes to review but does not prove current activity', () => {
+test('prior sensitivity alone does not trigger nonsevere empirical MEPM review', () => {
   const result = assessEsbl('pyelonephritis', true, { ...empirical, severity: 'nonsevere', priorCarbapenemActivity: 'susceptible' });
-  assert.equal(result.empiricConsideration, true);
+  assert.equal(result.empiricConsideration, false);
   assert.equal(result.definitiveConsideration, false);
 });
 
