@@ -181,8 +181,44 @@ function GuideCharacter({ message }: { message: string }) {
 }
 
 export default function NavigatorApp() {
+  const [selectedInfection, setSelectedInfection] = useState<InfectionId | null>(null);
+  if (selectedInfection !== null) {
+    return <SelectedNavigatorApp initialInfectionId={selectedInfection} onClear={() => setSelectedInfection(null)} />;
+  }
+  return (
+    <main className="app-shell">
+      <section className="hero">
+        <div>
+          <p className="eyebrow">Infection & Antibiotic Navigator</p>
+          <div className="title-line"><h1>感染症・抗菌薬初期選択支援</h1><span className="beta-badge">v0.9 Beta</span></div>
+          <p className="beta-note">β版：医学データおよび抗菌薬情報を順次拡充中です。</p>
+          <p className="safety-note">本ツールは診断・処方を自動確定するものではありません。最新の添付文書・院内プロトコルを確認し、最終判断は担当医が行ってください。医学専門家による最終レビューは未完了です。</p>
+        </div>
+        <GuideCharacter message={guideMessages.hero} />
+      </section>
+      <section className="step-block">
+        <StepHeading step="Step 0" title="Red Flag・緊急性" lead="重症・敗血症・ショックが疑われる場合は、入力や培養結果を待って緊急治療を遅らせないでください。" />
+      </section>
+      <section className="step-block">
+        <StepHeading step="Step 1" title="感染臓器・病型" lead="未選択です。感染症を選択するまで抗菌薬候補・用量・患者個別推奨は表示しません。" />
+        <div className="select-line">
+          <label htmlFor="infection">感染臓器・病型</label>
+          <select id="infection" value="" onChange={event => {
+            const selected = infectionProfiles.find(profile => profile.id === event.target.value);
+            if (selected) setSelectedInfection(selected.id);
+          }}>
+            <option value="">感染症を選択してください</option>
+            {infectionProfiles.map(profile => <option key={profile.id} value={profile.id}>{profile.group}：{profile.label}</option>)}
+          </select>
+        </div>
+      </section>
+    </main>
+  );
+}
+
+function SelectedNavigatorApp({ initialInfectionId, onClear }: { initialInfectionId: InfectionId; onClear: () => void }) {
   const [esblEvidence, setEsblEvidence] = useState<EsblEvidence>({ ...emptyEsblEvidence });
-  const [infectionId, setInfectionId] = useState<InfectionId>("cap");
+  const [infectionId, setInfectionId] = useState<InfectionId>(initialInfectionId);
   const changeInfection = (nextId: InfectionId) => {
     setEsblEvidence(current => esblEvidenceForSiteChange(current, infectionId, nextId));
     setInfectionId(nextId);
@@ -314,7 +350,7 @@ export default function NavigatorApp() {
           <strong>初期版の対象外</strong>
           <span>{unsupportedConditions.join(" / ")} は専門医・専門ガイドラインの確認を推奨します。</span>
         </div>
-        <StepResetButton onReset={() => changeInfection("cap")} />
+        <StepResetButton onReset={onClear} />
       </section>
 
       <section className="step-block">
@@ -354,7 +390,7 @@ export default function NavigatorApp() {
           ))}
         </div>
         {infectionId === "cap" && <p className="micro-note">尿中肺炎球菌抗原陽性だけで肺炎球菌性肺炎と断定せず、臨床像・培養・画像と合わせて判断してください。</p>}
-        <StepResetButton onReset={() => changeInfection("cap")} />
+        <StepResetButton onReset={onClear} />
       </section>
 
       <section className="step-block">
@@ -456,15 +492,15 @@ export default function NavigatorApp() {
         <details className="reference-regimens"><summary>参考候補・併用レジメン（現在推奨とは区別）</summary><p>各レジメンは別の選択肢です。構成薬は併用を示し、全候補の同時投与を意味しません。参考薬は現在の用量・安全性評価の対象に含めません。</p><div className="candidate-layout">
           {result.empiricRegimens.length > 0 ? (
             <>
-              <RegimenColumn title="標準候補" regimens={result.empiricRegimens.filter((item) => item.category === "standard")} />
-              <RegimenColumn title="重症例候補" regimens={result.empiricRegimens.filter((item) => item.category === "severe")} />
-              <RegimenColumn title="代替候補" regimens={result.empiricRegimens.filter((item) => item.category === "alternative")} />
+              <RegimenColumn title="標準の参考候補（患者個別推奨ではありません）" regimens={result.empiricRegimens.filter((item) => item.category === "standard")} />
+              <RegimenColumn title="重症例の参考候補" regimens={result.empiricRegimens.filter((item) => item.category === "severe")} />
+              <RegimenColumn title="代替の参考候補" regimens={result.empiricRegimens.filter((item) => item.category === "alternative")} />
             </>
           ) : (
             <>
-              <CandidateColumn title="標準候補" drugs={result.standardCandidates} reasoning={reasoning.selected} infectionId={infectionId} />
-              <CandidateColumn title="重症例候補" drugs={result.severeCandidates} reasoning={reasoning.selected} infectionId={infectionId} />
-              <CandidateColumn title="代替候補" drugs={result.alternativeCandidates} reasoning={reasoning.selected} infectionId={infectionId} />
+              <CandidateColumn title="標準の参考候補（患者個別推奨ではありません）" drugs={result.standardCandidates} reasoning={reasoning.selected} infectionId={infectionId} />
+              <CandidateColumn title="重症例の参考候補" drugs={result.severeCandidates} reasoning={reasoning.selected} infectionId={infectionId} />
+              <CandidateColumn title="代替の参考候補" drugs={result.alternativeCandidates} reasoning={reasoning.selected} infectionId={infectionId} />
             </>
           )}
         </div>

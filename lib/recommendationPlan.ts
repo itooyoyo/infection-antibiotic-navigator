@@ -4,7 +4,7 @@ import type { assessEsbl, assessSeverity } from "../data/esblAssessment.ts";
 // Alternative regimens are separate choices, not simultaneous prescriptions.
 export function buildCurrentPlan(regimens: EmpiricRegimen[], esbl: ReturnType<typeof assessEsbl>, severity: ReturnType<typeof assessSeverity>, additionalCoverageReview = false) {
   const references = regimens;
-  const unresolved = severity.value !== "nonsevere" || Boolean(severity.warning) || esbl.needsUrgentCoverageReview || esbl.considerMeropenem || additionalCoverageReview;
+  const unresolved = severity.value !== "nonsevere" || Boolean(severity.warning) || Boolean(esbl.historyReviewWarning) || esbl.needsUrgentCoverageReview || esbl.considerMeropenem || additionalCoverageReview;
   const base = references.find(r => r.category === "standard");
   const plans = base ? [base] : [];
   return {
