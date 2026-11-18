@@ -391,14 +391,14 @@ export default function NavigatorApp() {
           <h3>推奨抗菌薬候補</h3>
           <strong>{result.plan.currentRegimens.map(regimen => `${regimen.label}（${regimen.drugIds.map(id => antibiotics.find(drug => drug.id === id)?.genericName ?? id).join(" ＋ ")}）`).join(" / ") || "現在推奨は未確定・専門家と確認"}</strong>
           <p role="alert">{result.plan.warning}</p>
-          {result.clinicalSeverity.warning && <p role="alert" className="drug-alert">{result.clinicalSeverity.warning}</p>}
+          {result.clinicalSeverity.warning && <p role="alert" className="drug-alert"><span className="warning-label">注意</span>{result.clinicalSeverity.warning}</p>}
           <h3>{result.esblAssessment.phase === "empiric" ? "経験的治療" : "確定治療"}：MEPM判断</h3>
           <strong>{result.esblAssessment.considerMeropenem ? "メロペネム（MEPM）：検討候補" : "MEPMの活性・適応を個別確認"}</strong>
           <p>{result.esblAssessment.message}</p>
-          {result.esblAssessment.historyReviewWarning && <p role="alert" className="drug-alert">{result.esblAssessment.historyReviewWarning}</p>}
-          {result.esblAssessment.needsUrgentCoverageReview && <p role="alert" className="drug-alert">{result.esblAssessment.emergencyWarning}</p>}
+          {result.esblAssessment.historyReviewWarning && <p role="alert" className="drug-alert"><span className="warning-label">注意</span>{result.esblAssessment.historyReviewWarning}</p>}
+          {result.esblAssessment.needsUrgentCoverageReview && <p role="alert" className="drug-alert"><span className="warning-label">重大</span>{result.esblAssessment.emergencyWarning}</p>}
           {result.reviewCandidates.length > 0 && <p>検討薬（{result.reviewCandidates.map(drug => drug.genericName).join(" / ")}）も用量・安全性確認に含めます。これは併用推奨ではありません。MEPM単剤で必要カバー全体を満たすとは限らず、必要な併用は別途確認してください。</p>}
-          {result.esblAssessment.alternativeSafetyWarning && <p role="alert" className="drug-alert">{result.esblAssessment.alternativeSafetyWarning}</p>}
+          {result.esblAssessment.alternativeSafetyWarning && <p role="alert" className="drug-alert"><span className="warning-label">注意</span>{result.esblAssessment.alternativeSafetyWarning}</p>}
           <details><summary>判断材料・不明情報・参照</summary><ul>{result.esblAssessment.factors.map(factor => <li key={factor}>{factor}</li>)}</ul><p>{result.esblAssessment.timingNote}</p><p>{result.esblAssessment.reviewStatus}。不明項目: {result.esblAssessment.unknowns.join(" / ") || "なし"}</p><p>国内承認・院内プロトコルの確認が必要です。代替薬の適合性は菌種・薬剤・感染部位ごとに評価してください。</p><p><a href={result.esblAssessment.source.url} target="_blank" rel="noreferrer">{result.esblAssessment.source.title}</a> / 確認日 {result.esblAssessment.source.checkedAt}</p></details>
         </div>
         <div className="renal-grid">

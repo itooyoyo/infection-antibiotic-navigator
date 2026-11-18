@@ -2,7 +2,9 @@
 
 .recommendation-focus { padding: 20px 0; border-block: 1px solid #35d7ff; overflow-wrap: anywhere; }
 .recommendation-focus > strong { display: block; font-size: 1.5rem; color: #e5f6ff; line-height: 1.5; }
-.recommendation-focus p { font-size: 1rem; line-height: 1.65; color: #e5f6ff; }
+.recommendation-focus p { font-size: 1rem; line-height: 1.65; }
+.recommendation-focus p:not(.drug-alert):not(.interaction) { color: #e5f6ff; }
+.warning-label { display: inline; margin-right: 0.5em; font-weight: 800; color: inherit; }
 .reference-regimens { min-width: 0; overflow-wrap: anywhere; }
 .reference-regimens > summary { min-height: 44px; padding-block: 12px; }
 
@@ -1003,7 +1005,7 @@ dd {
   border-left: 3px solid var(--yellow);
   padding: 10px 12px;
   background: #fff7d6;
-  color: #3f2600;
+  color: var(--ink);
   line-height: 1.55;
 }
 
