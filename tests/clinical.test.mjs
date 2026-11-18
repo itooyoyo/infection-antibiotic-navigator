@@ -481,7 +481,7 @@ const safetyInput = (overrides = {}) => ({ ...emptyMedicationSafetyInput(), ...o
 const findSafety = (drugIds, overrides, id) => evaluateMedicationSafety(drugIds, safetyInput(overrides)).find((entry) => entry.id === id);
 
 test("Medication Safety入力は指定項目と飲酒・CDIリスクを保持する", () => {
-  assert.equal(medicationSafetyInputLabels.length, 18);
+  assert.equal(medicationSafetyInputLabels.length, 20);
   const labels = medicationSafetyInputLabels.map(([, label]) => label).join("、");
   for (const term of ["βラクタム", "アナフィラキシー", "妊娠", "授乳", "G6PD", "QT", "てんかん", "肝障害", "血液透析", "腹膜透析", "CRRT", "バルプロ酸", "ワルファリン", "DOAC", "タクロリムス", "シクロスポリン", "飲酒", "C. difficile"]) assert.ok(labels.includes(term), term);
 });
